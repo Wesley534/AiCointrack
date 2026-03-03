@@ -1,0 +1,58 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build & Dependencies
+node_modules/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firebase Service Account Keys (NEVER commit these!)
+**/serviceAccountKey.json
+serviceAccountKey.json
+
+# Backend specific
+backend/.env
+backend/venv/
+backend/.venv/
+backend/__pycache__/
+backend/*.py[cod]
+backend/*.sqlite3
+backend/*.db
+
+# Mobile specific
+mobile/aicointrack/build/
+mobile/aicointrack/.dart_tool/
+mobile/aicointrack/pubspec.lock
+
+# Node specific
+node_modules/
+package-lock.json
+yarn.lock
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# Testing
+.coverage
+.pytest_cache/
+coverage/

@@ -1,11 +1,44 @@
+# Python
 __pycache__/
 *.py[cod]
-*.sqlite3
-*.db
-.env
-venv/
-.venv/
+*.egg-info/
+*.eggs/
+dist/
+build/
 .mypy_cache/
 .pytest_cache/
+.coverage
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment Variables (NEVER commit these!)
+.env
+.env.local
+.env.*.local
+
+# Firebase Service Account Key (NEVER commit this!)
+serviceAccountKey.json
+
+# Database
+*.sqlite3
+*.db
+*.sqlite
+
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
