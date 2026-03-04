@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../firebase_options.dart';
+import '../config/theme.dart';
 import 'home_page.dart';
 
 /// Login page with Google Sign-In authentication
@@ -96,6 +97,12 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
+    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
+    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+
     // Check if user is already signed in
     if (AuthService.isUserSignedIn()) {
       // Redirect to home page if already logged in
@@ -108,6 +115,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     return Scaffold(
+      backgroundColor: bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -124,7 +132,7 @@ class _LoginPageState extends State<LoginPage> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(24),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF00E5A0), Color(0xFF7C6AFA)],
+                    colors: [AppColors.accentGreen, AppColors.purple],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -140,13 +148,12 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 24),
 
               // App Title
-              const Text(
+              Text(
                 'CoinTrack',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFFE8EDF5),
-                  fontFamily: 'Inter',
+                  color: textColor,
                   letterSpacing: -0.5,
                 ),
                 textAlign: TextAlign.center,
@@ -155,11 +162,11 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 12),
 
               // Subtitle
-              const Text(
+              Text(
                 'Your AI-powered money companion\n— tracks every shilling, automatically.',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF6B7A90),
+                  color: mutedColor,
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -172,18 +179,18 @@ class _LoginPageState extends State<LoginPage> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    border: Border.all(color: Colors.red),
+                    color: AppColors.danger.withOpacity(0.1),
+                    border: Border.all(color: AppColors.danger),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.red),
+                      const Icon(Icons.error_outline, color: AppColors.danger),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
+                          style: const TextStyle(color: AppColors.danger),
                         ),
                       ),
                     ],
@@ -199,14 +206,14 @@ class _LoginPageState extends State<LoginPage> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _handleGoogleSignIn,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E5A0),
+                    backgroundColor: AppColors.accentGreen,
                     foregroundColor: Colors.black,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    disabledBackgroundColor: const Color(0xFF00E5A0).withOpacity(0.5),
+                    disabledBackgroundColor: AppColors.accentGreen.withOpacity(0.5),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -222,7 +229,6 @@ class _LoginPageState extends State<LoginPage> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            fontFamily: 'Inter',
                           ),
                         ),
                 ),
@@ -236,8 +242,8 @@ class _LoginPageState extends State<LoginPage> {
                   onPressed: _isLoading ? null : _handleGoogleSignIn,
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: const Color(0xFF6B7A90),
-                    side: const BorderSide(color: Color(0xFF1E2A3A)),
+                    foregroundColor: mutedColor,
+                    side: BorderSide(color: borderColor),
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -260,9 +266,9 @@ class _LoginPageState extends State<LoginPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00E5A0).withOpacity(0.08),
+                  color: AppColors.accentGreen.withOpacity(0.08),
                   border: Border.all(
-                    color: const Color(0xFF00E5A0).withOpacity(0.2),
+                    color: AppColors.accentGreen.withOpacity(0.2),
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -273,17 +279,17 @@ class _LoginPageState extends State<LoginPage> {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF00E5A0),
+                        color: AppColors.accentGreen,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Powered by Firebase — your data is secure',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFF6B7A90),
+                          color: mutedColor,
                         ),
                       ),
                     ),
