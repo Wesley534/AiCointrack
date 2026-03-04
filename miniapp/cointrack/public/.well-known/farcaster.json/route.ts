@@ -1,6 +1,3 @@
-import { withValidManifest } from "@coinbase/onchainkit/minikit";
-import { minikitConfig } from "../../../minikit.config";
-
-export async function GET() {
-  return Response.json(withValidManifest(minikitConfig));
-}
+// This path is in /public and is not used as an App Router endpoint.
+// The active Farcaster manifest route is:
+// app/.well-known/farcaster.json/route.ts
