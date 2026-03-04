@@ -30,7 +30,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem("cointrack_theme");t==="light"||t==="dark"?document.documentElement.setAttribute("data-theme",t):document.documentElement.setAttribute("data-theme","dark");})();`,
+          }}
+        />
+      </head>
       <body style={{ margin: 0, padding: 0, fontFamily: "'Outfit', sans-serif" }}>
         <RootProvider>
           <SafeArea>

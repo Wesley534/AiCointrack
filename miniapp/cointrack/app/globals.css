@@ -6,7 +6,13 @@
   padding: 0;
 }
 
+html,
 body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  /* Default dark theme background; ThemeWrapper overrides on hydration */
+  background: #131923;
   font-family: 'Outfit', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -17,12 +23,26 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #F4F7F5;
+  background: #111620;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #E0EDE7;
+  background: #1E2A3A;
   border-radius: 4px;
+}
+
+/* Light theme overrides (applied via data-theme on html when theme is light) */
+html[data-theme="light"],
+html[data-theme="light"] body {
+  background: #FFFFFF;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #F4F7F5;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #E0EDE7;
 }
 
 button {

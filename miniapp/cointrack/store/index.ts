@@ -1,5 +1,13 @@
 import { create } from "zustand"
 
+const STORAGE_KEY = "cointrack_theme"
+
+function getStoredTheme(): "light" | "dark" {
+  if (typeof window === "undefined") return "dark"
+  const s = localStorage.getItem(STORAGE_KEY)
+  return s === "light" || s === "dark" ? s : "dark"
+}
+
 interface AppState {
   // Auth
   address: string | null
@@ -41,6 +49,9 @@ export const useAppStore = create<AppState>(set => ({
   activeSheet: null,
   setActiveSheet: sheet => set({ activeSheet: sheet }),
 
-  theme: "light",
-  setTheme: theme => set({ theme }),
+  theme: getStoredTheme(),
+  setTheme: theme => {
+    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, theme)
+    set({ theme })
+  },
 }))

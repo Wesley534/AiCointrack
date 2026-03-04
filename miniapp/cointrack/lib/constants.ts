@@ -71,9 +71,9 @@ export const lightTheme: Theme = {
   card: "#FFFFFF",
   border: "#E0EDE7",
   borderMid: "#C8DDD4",
-  green: "#00A86B",
-  greenDim: "#007A4D",
-  greenBg: "#E8F9F2",
+  green: "#0052FF", // Base blue
+  greenDim: "#0047B3",
+  greenBg: "rgba(0,82,255,0.1)",
   indigo: "#4F46E5",
   indigoBg: "#EEF2FF",
   amber: "#D97706",
@@ -86,28 +86,28 @@ export const lightTheme: Theme = {
   white: "#FFFFFF",
 }
 
-// Theme colors (Dark Mode)
+// Theme colors (Dark Mode) – aligned with mobile AppColors
 export const darkTheme: Theme = {
   bg: "#0A0D12",
   surface: "#111620",
   card: "#161C28",
   border: "#1E2A3A",
-  accent: "#00E5A0",
-  accentDim: "#00A372",
-  purple: "#7C6AFA",
-  warning: "#F59E0B",
-  danger: "#EF4444",
+  accent: "#0052FF", // Base blue
+  accentDim: "#0047B3",
+  purple: "#4F46E5", // AppColors.purple
+  warning: "#D97706", // AppColors.warning
+  danger: "#DC2626", // AppColors.danger
   text: "#E8EDF5",
   muted: "#6B7A90",
   // Aliases for compatibility
-  green: "#00E5A0",
-  red: "#EF4444",
+  green: "#0052FF",
+  red: "#DC2626",
   mid: "#6B7A90",
   bg2: "#161C28",
   bg3: "#1E2A3A",
-  greenBg: "rgba(0,229,160,0.1)",
-  amberBg: "rgba(245,158,11,0.1)",
-  redBg: "rgba(239,68,68,0.1)",
-  indigoBg: "rgba(124,106,250,0.15)",
+  greenBg: "rgba(0,82,255,0.1)",
+  amberBg: "rgba(217,119,6,0.1)",
+  redBg: "rgba(220,38,38,0.1)",
+  indigoBg: "rgba(79,70,229,0.15)",
 }
 
