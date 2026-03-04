@@ -59,8 +59,8 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
       setCategory("")
       onSuccess?.()
       onClose()
-    } catch (err: any) {
-      setError(err.message || "Failed to add transaction")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add transaction")
     } finally {
       setLoading(false)
     }

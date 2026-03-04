@@ -1,11 +1,11 @@
-import { readContract, writeContract, waitForTransactionReceipt } from "@wagmi/core"
+import { readContract, writeContract, waitForTransactionReceipt, type Config } from "@wagmi/core"
 import { USDC_ADDRESS, ERC20_ABI, USDC_DECIMALS } from "./constants"
 import { parseUsdc } from "./format"
 
 /**
  * Get USDC balance for an address
  */
-export async function getUsdcBalance(config: any, address: string): Promise<bigint> {
+export async function getUsdcBalance(config: Config, address: string): Promise<bigint> {
   const balance = await readContract(config, {
     address: USDC_ADDRESS as `0x${string}`,
     abi: ERC20_ABI,
@@ -19,7 +19,7 @@ export async function getUsdcBalance(config: any, address: string): Promise<bigi
  * Send USDC to another address
  */
 export async function sendUsdc(
-  config: any,
+  config: Config,
   to: string,
   amount: string | number
 ): Promise<string> {

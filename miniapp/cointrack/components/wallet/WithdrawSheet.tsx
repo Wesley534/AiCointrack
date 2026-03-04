@@ -7,6 +7,12 @@ import AmountInput from "@/components/ui/AmountInput"
 import { initiateWithdrawal, getWithdrawDestinations } from "@/lib/api"
 import { useQuery } from "@tanstack/react-query"
 
+interface WithdrawDestination {
+  id: string
+  type: string
+  label: string
+}
+
 interface WithdrawSheetProps {
   isOpen: boolean
   onClose: () => void
@@ -52,15 +58,15 @@ export default function WithdrawSheet({ isOpen, onClose }: WithdrawSheetProps) {
       setAmount("")
       setDestinationId("")
       onClose()
-    } catch (err: any) {
-      setError(err.message || "Withdrawal failed")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Withdrawal failed")
     } finally {
       setLoading(false)
     }
   }
 
   const filteredDestinations = destinations?.filter(
-    (d: any) => d.type === destinationType
+    (d: WithdrawDestination) => d.type === destinationType
   ) || []
 
   return (
@@ -154,7 +160,7 @@ export default function WithdrawSheet({ isOpen, onClose }: WithdrawSheetProps) {
             }}
           >
             <option value="">Select destination...</option>
-            {filteredDestinations.map((dest: any) => (
+            {filteredDestinations.map((dest: WithdrawDestination) => (
               <option key={dest.id} value={dest.id}>
                 {dest.label}
               </option>

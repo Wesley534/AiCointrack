@@ -9,7 +9,7 @@ interface TransactionItemProps {
     id: string
     description: string
     amount: number
-    category?: { name: string }
+    category?: string | { name: string }
     date: string
     source: string
   }
@@ -46,7 +46,7 @@ export default function TransactionItem({ transaction }: TransactionItemProps) {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {transaction.category && (
-            <Pill variant="default">{transaction.category.name}</Pill>
+            <Pill variant="default">{typeof transaction.category === 'string' ? transaction.category : transaction.category.name}</Pill>
           )}
           <Pill variant={transaction.source === "manual" ? "indigo" : "default"}>
             {transaction.source}

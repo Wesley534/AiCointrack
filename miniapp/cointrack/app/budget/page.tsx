@@ -6,6 +6,14 @@ import { useBudget } from "@/hooks/useBudget"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
+interface Category {
+  name: string
+  icon: string
+  spent: number
+  budget: number
+  type: "need" | "want" | "save"
+}
+
 export default function BudgetPage() {
   const { data, isLoading } = useBudget()
   const { theme } = useAppStore()
@@ -26,7 +34,7 @@ export default function BudgetPage() {
   const categories = data?.categories || []
 
   // Mock data if no real data
-  const mockCategories = [
+  const mockCategories: Category[] = [
     { name: "Food & Dining", icon: "🍽️", spent: 15000, budget: 20000, type: "need" as const },
     { name: "Transport", icon: "🚗", spent: 8000, budget: 10000, type: "need" as const },
     { name: "Shopping", icon: "🛍️", spent: 12000, budget: 15000, type: "want" as const },
@@ -58,7 +66,7 @@ export default function BudgetPage() {
             Categories
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {displayCategories.map((cat: any, idx: number) => (
+            {displayCategories.map((cat: Category, idx: number) => (
               <CategoryCard key={idx} category={cat} />
             ))}
           </div>
