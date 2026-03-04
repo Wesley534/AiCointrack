@@ -1,33 +1,40 @@
 import { SiweMessage } from "siwe"
-import { walletLogin } from "./api"
+import { getNonce, walletLogin } from "./api"
 
 export async function authenticateWallet(
   address: string,
   chainId: number,
   signMessageAsync: (args: { message: string }) => Promise<string>
-) {
-  // Build the SIWE message
+): Promise<string> {
+  // Prefetch nonce from backend (Base docs: avoid popup blockers, enables server-side nonce tracking)
+  let nonce: string
+  try {
+    nonce = await getNonce()
+  } catch {
+    nonce = Math.random().toString(36).slice(2) + Date.now().toString(36)
+  }
+
   const message = new SiweMessage({
-    domain: window.location.host,
+    domain: typeof window !== "undefined" ? window.location.host : "cointrack.xyz",
     address,
     statement: "Sign in to Cointrack",
-    uri: window.location.origin,
+    uri: typeof window !== "undefined" ? window.location.origin : "https://cointrack.xyz",
     version: "1",
     chainId,
-    nonce: Math.random().toString(36).slice(2)
+    nonce,
   })
 
   const messageString = message.prepareMessage()
-
-  // User signs it with their Base wallet
   const signature = await signMessageAsync({ message: messageString })
 
-  // Send to backend for verification
   const response = await walletLogin(address, signature, messageString)
-  const { token } = response.data
+  const jwt = response.data?.jwt ?? response.data?.accessToken
+  if (!jwt) {
+    throw new Error(response.data?.detail ?? "No token in response")
+  }
 
-  // Store JWT
-  localStorage.setItem("pocketpal_jwt", token)
-
-  return token
+  if (typeof window !== "undefined") {
+    localStorage.setItem("pocketpal_jwt", jwt)
+  }
+  return jwt
 }

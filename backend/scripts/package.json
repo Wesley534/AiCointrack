@@ -1,0 +1,7 @@
+{
+  "name": "cointrack-verify-siwe",
+  "type": "module",
+  "dependencies": {
+    "viem": "^2.0.0"
+  }
+}

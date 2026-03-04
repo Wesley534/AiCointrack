@@ -2,6 +2,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/token_service.dart';
 import '../config/constants.dart';
 import '../config/theme.dart';
 
@@ -11,10 +12,7 @@ class ApiService {
   static const String baseUrl = AppConstants.BACKEND_URL;
 
   /// Register or authenticate user on the backend using Firebase ID token.
-  ///
-  /// This method retrieves the Firebase ID token from the current user
-  /// and sends it to your backend API. Your backend should verify the token
-  /// with Firebase Admin SDK and create/update the user in your database.
+  /// Stores the returned JWT for subsequent API calls.
   static Future<Map<String, dynamic>> registerUserWithBackend() async {
     try {
       final idToken = await AuthService.getIdToken();
@@ -25,10 +23,8 @@ class ApiService {
 
       final response = await http
           .post(
-            Uri.parse('$baseUrl/api/v1/auth/firebase/register'),
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            Uri.parse('$baseUrl/api/v1/auth/firebase'),
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode({'idToken': idToken}),
           )
           .timeout(
@@ -37,7 +33,12 @@ class ApiService {
           );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final jwt = data['accessToken'] ?? data['jwt'];
+        if (jwt != null) {
+          await TokenService.saveJwt(jwt);
+        }
+        return data;
       } else {
         throw Exception(
           'Backend registration failed: ${response.statusCode} - ${response.body}',
@@ -46,6 +47,72 @@ class ApiService {
     } catch (e) {
       throw Exception('Failed to register user: $e');
     }
+  }
+
+  /// Wallet login via SIWE. Returns JWT and optional firebase_custom_token.
+  static Future<Map<String, dynamic>> walletLogin({
+    required String address,
+    required String signature,
+    required String message,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/auth/wallet'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'address': address,
+            'signature': signature,
+            'message': message,
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Wallet login failed: ${response.statusCode} - ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final jwt = data['jwt'];
+    if (jwt != null) {
+      await TokenService.saveJwt(jwt);
+    }
+    return data;
+  }
+
+  /// Link wallet to existing account. Requires Firebase token.
+  static Future<Map<String, dynamic>> linkWallet({
+    required String firebaseToken,
+    required String address,
+    required String signature,
+    required String message,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/auth/link-wallet'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'firebase_token': firebaseToken,
+            'address': address,
+            'signature': signature,
+            'message': message,
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Link wallet failed: ${response.statusCode} - ${response.body}',
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   /// Refresh the ID token and send to backend (optional helper).
@@ -75,21 +142,21 @@ class ApiService {
     }
   }
 
-  /// Fetch user profile data from backend.
+  /// Fetch user profile from backend. Uses JWT if available.
   static Future<Map<String, dynamic>> fetchUserProfile() async {
     try {
-      final idToken = await AuthService.getIdToken();
-
-      if (idToken == null) {
+      var token = await TokenService.getJwt();
+      if (token == null) {
+        token = await AuthService.getIdToken();
+      }
+      if (token == null) {
         throw Exception('No user signed in');
       }
 
       final response = await http
           .get(
-            Uri.parse('$baseUrl/api/v1/users/profile'),
-            headers: {
-              'Authorization': 'Bearer $idToken',
-            },
+            Uri.parse('$baseUrl/api/v1/auth/me'),
+            headers: {'Authorization': 'Bearer $token'},
           )
           .timeout(
             const Duration(seconds: 10),
@@ -99,6 +166,7 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       } else if (response.statusCode == 401) {
+        await TokenService.clearJwt();
         await AuthService.signOut();
         throw Exception('Unauthorized - please sign in again');
       } else {

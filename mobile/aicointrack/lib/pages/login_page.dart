@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../firebase_options.dart';
 import '../config/theme.dart';
 import 'home_page.dart';
+import 'email_login_page.dart';
 
 /// Login page with Google Sign-In authentication
 /// Handles user authentication flow and navigation to home page
@@ -234,7 +235,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              // Alternative sign-in button
+              // Sign in with Google (explicit)
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -252,6 +253,90 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: const Text(
                     'Sign in with Google',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+              // Email/password
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const EmailLoginPage(isSignUp: false),
+                            ),
+                          );
+                        },
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: mutedColor,
+                    side: BorderSide(color: borderColor),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Sign in with email',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+              // Continue with Base Wallet
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Base Wallet'),
+                              content: const Text(
+                                'To sign in with your Base wallet, open CoinTrack '
+                                'inside the Base app miniapp. After signing in there, '
+                                'you can use your wallet to access the full app here.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: mutedColor,
+                    side: BorderSide(color: borderColor),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.account_balance_wallet, size: 20),
+                  label: const Text(
+                    'Continue with Base Wallet',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,

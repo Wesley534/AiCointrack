@@ -166,6 +166,29 @@ def verify_firebase_token(token: str) -> dict:
         )
 
 
+def create_custom_token(uid: str) -> str:
+    """
+    Create a Firebase custom token for the given UID.
+    Used when wallet login succeeds - allows Flutter to sign in with signInWithCustomToken().
+
+    Requires service account credentials. Will raise if only using project ID.
+    """
+    from firebase_admin import auth
+
+    if not _firebase_initialized:
+        raise RuntimeError("Firebase not initialized. Call init_firebase() first.")
+
+    try:
+        token = auth.create_custom_token(uid)
+        return token.decode("utf-8") if isinstance(token, bytes) else token
+    except Exception as e:
+        logger.error(f"create_custom_token failed (need service account credentials): {e}")
+        raise ValueError(
+            "Custom token creation requires Firebase service account credentials. "
+            "Set FIREBASE_CREDENTIALS_PATH or GOOGLE_APPLICATION_CREDENTIALS."
+        ) from e
+
+
 def get_firebase_user(uid: str):
     """
     Get Firebase user by UID.

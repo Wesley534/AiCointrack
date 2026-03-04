@@ -15,6 +15,7 @@ export default function Page() {
   const { setAuth, theme } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retryKey, setRetryKey] = useState(0)
   const colors = theme === "light" ? lightTheme : darkTheme
 
   // Tell Base app the miniapp is ready
@@ -58,18 +59,34 @@ export default function Page() {
     async function doAuth() {
       try {
         const token = await authenticateWallet(
-          address!, chainId || 8453, signMessageAsync
+          address!,
+          chainId || 8453,
+          signMessageAsync
         )
         const userRes = await getMe()
         setAuth(address!, token, userRes.data)
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Auth error:", err)
-        setError("Authentication failed. Please try again.")
+        const res = err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: unknown; status?: number } }).response
+          : null
+        const detail = res?.data && typeof res.data === "object" && "detail" in res.data
+          ? (res.data as { detail: unknown }).detail
+          : null
+        const msg =
+          typeof detail === "string"
+            ? detail
+            : Array.isArray(detail)
+              ? detail.map(String).join(", ")
+              : err instanceof Error
+                ? err.message
+                : "Authentication failed. Please try again."
+        setError(msg)
       } finally {
         setLoading(false)
       }
     }
-  }, [isConnected, address, chainId, signMessageAsync, setAuth])
+  }, [isConnected, address, chainId, signMessageAsync, setAuth, retryKey])
 
   if (loading) return (
     <div style={{ 
@@ -117,12 +134,35 @@ export default function Page() {
   if (error) return (
     <div style={{ 
       padding: 32, 
-      textAlign: "center", 
-      color: colors.red,
+      textAlign: "center",
       background: theme === "light" ? colors.bg : colors.surface,
       minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16,
     }}>
-      {error}
+      <div style={{ color: colors.red || colors.danger, fontSize: 14 }}>{error}</div>
+      <button
+        type="button"
+        onClick={() => {
+          setError(null)
+          setLoading(true)
+          setRetryKey((k) => k + 1)
+        }}
+        style={{
+          padding: "12px 24px",
+          borderRadius: 8,
+          border: "none",
+          background: colors.green || colors.accent,
+          color: "#fff",
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Retry
+      </button>
     </div>
   )
 
