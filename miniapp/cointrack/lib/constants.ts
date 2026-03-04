@@ -7,7 +7,7 @@ export const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 export const VAULT_CONTRACT_ADDRESS = ""
 
 // Your FastAPI backend
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://api.cointrack.xyz"
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
 
 export const USDC_DECIMALS = 6
 

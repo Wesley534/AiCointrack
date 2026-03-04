@@ -12,6 +12,8 @@ click==8.3.1
 cryptography==46.0.5
 dnspython==2.8.0
 ecdsa==0.19.1
+eth-account>=0.10.0
+siwe>=2.0.0
 email-validator==2.3.0
 fastapi==0.135.1
 firebase_admin==7.2.0

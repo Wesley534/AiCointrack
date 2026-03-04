@@ -24,10 +24,10 @@ export async function authenticateWallet(
 
   // Send to backend for verification
   const response = await walletLogin(address, signature, messageString)
-  const { token } = response.data
+  const { jwt } = response.data
 
-  // Store JWT
-  localStorage.setItem("pocketpal_jwt", token)
+  // Store JWT for API calls
+  localStorage.setItem("pocketpal_jwt", jwt)
 
-  return token
+  return jwt
 }

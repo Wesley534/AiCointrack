@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../config/theme.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
+import 'wallet_options_page.dart';
 
 /// Home page displayed after successful authentication
 /// Registers user with backend and redirects to Dashboard
@@ -38,18 +39,43 @@ class _HomePageState extends State<HomePage> {
         final backendResponse = await ApiService.registerUserWithBackend();
 
         if (mounted) {
-          // Navigate to Dashboard on success
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => DashboardPage(
-                userName: _user?.displayName ?? 'User',
-                userEmail: _user?.email ?? '',
-                photoUrl: _user?.photoURL,
-                userData: backendResponse,
+          final userData = backendResponse['user'] ?? backendResponse;
+          final normalizedUserData = userData is Map<String, dynamic>
+              ? userData
+              : userData is Map
+              ? Map<String, dynamic>.from(userData)
+              : null;
+          final hasWallet =
+              userData is Map &&
+              userData['wallet_address'] != null &&
+              (userData['wallet_address'] as String).isNotEmpty;
+
+          if (!hasWallet) {
+            // Show wallet linking options
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => WalletOptionsPage(
+                  userName: _user?.displayName ?? 'User',
+                  userEmail: _user?.email ?? '',
+                  photoUrl: _user?.photoURL,
+                  userData: normalizedUserData,
+                ),
               ),
-            ),
-            (route) => false,
-          );
+              (route) => false,
+            );
+          } else {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => DashboardPage(
+                  userName: _user?.displayName ?? 'User',
+                  userEmail: _user?.email ?? '',
+                  photoUrl: _user?.photoURL,
+                  userData: normalizedUserData,
+                ),
+              ),
+              (route) => false,
+            );
+          }
         }
       }
     } catch (e) {
@@ -89,9 +115,9 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error signing out: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
     }
   }
 
@@ -129,7 +155,9 @@ class _HomePageState extends State<HomePage> {
                     'Welcome to CoinTrack',
                     style: TextStyle(
                       fontSize: 14,
-                      color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
                     ),
                   ),
                 ],
@@ -137,11 +165,7 @@ class _HomePageState extends State<HomePage> {
             else if (_hasError)
               Column(
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: AppColors.danger,
-                    size: 48,
-                  ),
+                  Icon(Icons.error_outline, color: AppColors.danger, size: 48),
                   const SizedBox(height: 16),
                   Text(
                     'Registration Failed',
@@ -156,8 +180,9 @@ class _HomePageState extends State<HomePage> {
                     'Unable to connect to backend',
                     style: TextStyle(
                       fontSize: 14,
-                      color:
-                          isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      color: isDark
+                          ? AppColors.darkMuted
+                          : AppColors.lightMuted,
                     ),
                   ),
                   const SizedBox(height: 24),

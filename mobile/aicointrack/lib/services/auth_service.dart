@@ -1,8 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'token_service.dart';
 
 /// Authentication service that handles Firebase Auth operations
-/// including Google Sign-In and token management.
+/// including Google Sign-In, Email/Password, Custom Token, and token management.
 class AuthService {
   static final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   static final GoogleSignIn _googleSignIn = GoogleSignIn();
@@ -44,11 +45,12 @@ class AuthService {
     }
   }
 
-  /// Sign out from Firebase and Google
+  /// Sign out from Firebase, Google, and clear stored JWT
   static Future<void> signOut() async {
     try {
       await _firebaseAuth.signOut();
       await _googleSignIn.signOut();
+      await TokenService.clearJwt();
     } catch (e) {
       throw Exception('Failed to sign out: $e');
     }
@@ -95,5 +97,37 @@ class AuthService {
   /// Stream to listen to authentication state changes
   static Stream<User?> authStateChanges() {
     return _firebaseAuth.authStateChanges();
+  }
+
+  /// Sign in with email and password
+  static Future<UserCredential> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    return await _firebaseAuth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  /// Create account with email and password
+  static Future<UserCredential> createUserWithEmail({
+    required String email,
+    required String password,
+    String? displayName,
+  }) async {
+    final cred = await _firebaseAuth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    if (displayName != null && displayName.isNotEmpty && cred.user != null) {
+      await cred.user!.updateDisplayName(displayName);
+    }
+    return cred;
+  }
+
+  /// Sign in with Firebase custom token (from wallet login)
+  static Future<UserCredential> signInWithCustomToken(String token) async {
+    return await _firebaseAuth.signInWithCustomToken(token);
   }
 }

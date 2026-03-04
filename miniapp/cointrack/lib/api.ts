@@ -12,10 +12,10 @@ api.interceptors.request.use(config => {
 
 // ── AUTH ──────────────────────────────────────────────
 export const walletLogin = (address: string, signature: string, message: string) =>
-  api.post("/auth/wallet-login", { address, signature, message })
+  api.post("/api/v1/auth/wallet", { address, signature, message })
 
 export const getMe = () =>
-  api.get("/auth/me")
+  api.get("/api/v1/auth/me")
 
 // ── HOME ──────────────────────────────────────────────
 export const getHomeData = () =>
