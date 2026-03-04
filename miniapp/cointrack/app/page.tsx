@@ -6,17 +6,13 @@ import { authenticateWallet } from "@/lib/auth"
 import { getMe } from "@/lib/api"
 import { useAppStore } from "@/store"
 import HomeTab from "@/components/home/HomeTab"
-import WalletPage from "./wallet/page"
-import BudgetPage from "./budget/page"
-import SavingsPage from "./savings/page"
-import TransactionsPage from "./transactions/page"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
 export default function Page() {
   const { address, isConnected, chainId } = useAccount()
   const { signMessageAsync } = useSignMessage()
   const { setMiniAppReady } = useMiniKit()
-  const { setAuth, activeTab, theme } = useAppStore()
+  const { setAuth, theme } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const colors = theme === "light" ? lightTheme : darkTheme
@@ -27,8 +23,17 @@ export default function Page() {
   }, [setMiniAppReady])
 
   useEffect(() => {
+    // For development: allow demo access without wallet connection
+    const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+    
     if (!isConnected || !address) {
-      setLoading(false)
+      if (isDemo) {
+        // Demo mode: set mock address for testing
+        setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
+        setLoading(false)
+      } else {
+        setLoading(false)
+      }
       return
     }
 
@@ -94,7 +99,7 @@ export default function Page() {
     </div>
   )
 
-  if (!isConnected) return (
+  if (!isConnected && process.env.NEXT_PUBLIC_DEMO_MODE !== "true") return (
     <div style={{ 
       padding: 32, 
       textAlign: "center",
@@ -121,30 +126,12 @@ export default function Page() {
     </div>
   )
 
-  // Render the appropriate tab based on activeTab
-  const renderTab = () => {
-    switch (activeTab) {
-      case "home":
-        return <HomeTab />
-      case "wallet":
-        return <WalletPage />
-      case "budget":
-        return <BudgetPage />
-      case "savings":
-        return <SavingsPage />
-      case "transactions":
-        return <TransactionsPage />
-      default:
-        return <HomeTab />
-    }
-  }
-
   return (
     <div style={{ 
       background: theme === "light" ? colors.bg : colors.surface,
       minHeight: "100vh",
     }}>
-      {renderTab()}
+      <HomeTab />
     </div>
   )
 }
