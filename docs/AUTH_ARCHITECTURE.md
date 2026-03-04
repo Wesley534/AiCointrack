@@ -65,10 +65,16 @@ auth_providers     # ["google"], ["email"], ["wallet"]
 - Run migration: `alembic upgrade head`
 - Firebase service account needed for `create_custom_token` (wallet → Flutter flow)
 - Enable Email/Password and Google in Firebase Console
+- **Base Account (ERC-6492)** — if wallet verify fails for smart wallets:
+  - `cd backend/scripts && npm install`
+  - Ensure `node` is on PATH; verification will fall back to Viem
 
-### Miniapp
-- `API_BASE_URL` in `lib/constants.ts` must point to backend
+### Miniapp (Base App)
+- Set `NEXT_PUBLIC_API_URL` in `.env.local` to your backend (e.g. `https://api.cointrack.xyz`)
+- Uses SIWE (Sign-In with Ethereum) per [Base docs](https://docs.base.org/base-account/guides/authenticate-users)
+- Fetches nonce from `GET /api/v1/auth/nonce` before sign-in
 - JWT stored as `pocketpal_jwt` in localStorage
+- For Base Account (smart wallet) / ERC-6492: install Node fallback in backend (see below)
 
 ### Flutter
 - `shared_preferences` for JWT storage

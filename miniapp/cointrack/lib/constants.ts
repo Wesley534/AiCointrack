@@ -6,8 +6,9 @@ export const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 // Your deployed PocketPal vault contract (add this after you deploy)
 export const VAULT_CONTRACT_ADDRESS = ""
 
-// Your FastAPI backend
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
+// Your FastAPI backend — set NEXT_PUBLIC_API_URL in .env.local
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://api.cointrack.xyz"
 
 export const USDC_DECIMALS = 6
 

@@ -11,6 +11,8 @@ from firebase_admin import auth
 from app.core.config import settings
 from app.core.security import create_access_token, decode_access_token, get_password_hash, verify_password
 from app.core.firebase_init import verify_firebase_token, create_custom_token
+import secrets
+
 from app.core.siwe_verify import verify_siwe_signature
 from app.core.deps import get_current_user_jwt
 from app.db.session import get_db
@@ -236,6 +238,14 @@ async def register_with_firebase(
         )
 
 
+@router.get("/nonce")
+async def get_nonce():
+    """
+    Return a fresh nonce for SIWE (Base docs: prefetch to avoid popup blockers).
+    """
+    return secrets.token_hex(16)
+
+
 @router.post("/firebase/verify")
 async def verify_firebase_token_endpoint(
     authorization: str = Header(None),
@@ -283,9 +293,10 @@ async def wallet_login(
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
-    addr = req.address
+    addr = req.address.strip()
     if not addr.startswith("0x"):
         addr = "0x" + addr
+    addr = addr.lower()
 
     user = db.query(User).filter(User.wallet_address == addr).first()
 
@@ -303,8 +314,7 @@ async def wallet_login(
             user=_user_to_dict(user),
         )
 
-    # New user — use deterministic UID; create_custom_token will let Flutter sign in
-    firebase_uid = f"wallet_{addr.lower()}"
+    firebase_uid = f"wallet_{addr}"
 
     new_user = User(
         firebase_uid=firebase_uid,
