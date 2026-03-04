@@ -5,6 +5,7 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import BottomNav from "@/components/layout/BottomNav";
+import ThemeWrapper from "@/components/ThemeWrapper";
 import "@coinbase/onchainkit/styles.css";
 
 const wagmiConfig = createConfig({
@@ -43,8 +44,10 @@ export function RootProvider({ children }: { children: ReactNode }) {
             notificationProxyUrl: undefined,
           }}
         >
-          {children}
-          <BottomNav />
+          <ThemeWrapper>
+            {children}
+            <BottomNav />
+          </ThemeWrapper>
         </OnchainKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

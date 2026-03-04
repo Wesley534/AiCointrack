@@ -27,7 +27,8 @@ export const minikitConfig = {
     screenshotUrls: [],
     iconUrl: `${ROOT_URL}/icon.png`,
     splashImageUrl: `${ROOT_URL}/splash.png`,
-    splashBackgroundColor: "#000000",
+    // Match mobile dark background color
+    splashBackgroundColor: "#0A0D12",
     homeUrl: ROOT_URL,
     webhookUrl: `${ROOT_URL}/api/webhook`,
     primaryCategory: "utility",
