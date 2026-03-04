@@ -4,6 +4,7 @@ export async function POST(request: Request) {
     console.log("Webhook received:", JSON.stringify(body, null, 2))
     return Response.json({ success: true })
   } catch (error) {
+    console.error("Webhook error:", error)
     return Response.json({ success: false }, { status: 400 })
   }
 }

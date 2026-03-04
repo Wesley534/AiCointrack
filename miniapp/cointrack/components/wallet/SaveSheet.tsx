@@ -10,6 +10,15 @@ import { sendUsdc } from "@/lib/wagmi"
 import { contributeToGoal, recordOnchainTx } from "@/lib/api"
 import { VAULT_CONTRACT_ADDRESS } from "@/lib/constants"
 
+interface Goal {
+  id: string
+  name: string
+  icon: string
+  target_amount: number
+  current_amount: number
+  deadline: string
+}
+
 interface SaveSheetProps {
   isOpen: boolean
   onClose: () => void
@@ -63,8 +72,8 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
       setAmount("")
       setSelectedGoal("")
       onClose()
-    } catch (err: any) {
-      setError(err.message || "Transaction failed")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transaction failed")
     } finally {
       setLoading(false)
     }
@@ -103,7 +112,7 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
             }}
           >
             <option value="">Choose a savings goal...</option>
-            {goals.map((goal: any) => (
+            {goals.map((goal: Goal) => (
               <option key={goal.id} value={goal.id}>
                 {goal.name} - ${goal.current_amount.toFixed(2)} / ${goal.target_amount.toFixed(2)}
               </option>

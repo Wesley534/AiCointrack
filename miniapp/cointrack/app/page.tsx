@@ -16,7 +16,7 @@ export default function Page() {
   const { address, isConnected, chainId } = useAccount()
   const { signMessageAsync } = useSignMessage()
   const { setMiniAppReady } = useMiniKit()
-  const { jwt, setAuth, activeTab, theme } = useAppStore()
+  const { setAuth, activeTab, theme } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const colors = theme === "light" ? lightTheme : darkTheme
@@ -57,7 +57,8 @@ export default function Page() {
         )
         const userRes = await getMe()
         setAuth(address!, token, userRes.data)
-      } catch (e) {
+      } catch (err) {
+        console.error("Auth error:", err)
         setError("Authentication failed. Please try again.")
       } finally {
         setLoading(false)

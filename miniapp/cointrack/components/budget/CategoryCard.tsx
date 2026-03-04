@@ -19,7 +19,6 @@ export default function CategoryCard({ category }: CategoryCardProps) {
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
 
-  const percentage = (category.spent / category.budget) * 100
   const remaining = category.budget - category.spent
 
   const typeColors = {

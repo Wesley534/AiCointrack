@@ -7,7 +7,6 @@ import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
 import { sendUsdc } from "@/lib/wagmi"
 import { recordOnchainTx } from "@/lib/api"
-import { kesToUsdc } from "@/lib/format"
 
 interface SendSheetProps {
   isOpen: boolean
@@ -15,7 +14,7 @@ interface SendSheetProps {
 }
 
 export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
-  const { theme, usdKesRate } = useAppStore()
+  const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
   const config = useConfig()
 
@@ -52,8 +51,8 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
       setRecipient("")
       setAmount("")
       onClose()
-    } catch (err: any) {
-      setError(err.message || "Transaction failed")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Transaction failed")
     } finally {
       setLoading(false)
     }

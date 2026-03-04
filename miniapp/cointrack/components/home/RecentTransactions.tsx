@@ -5,6 +5,15 @@ import { useTransactions } from "@/hooks/useTransactions"
 import { formatKes, formatRelativeDate } from "@/lib/format"
 import Pill from "@/components/ui/Pill"
 
+interface Transaction {
+  id: string
+  description: string
+  amount: number
+  category: string | { name: string }
+  date: string
+  source: string
+}
+
 export default function RecentTransactions() {
   const { theme } = useAppStore()
   const { data, isLoading } = useTransactions({ limit: 5 })
@@ -57,7 +66,7 @@ export default function RecentTransactions() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {transactions.map((tx: any) => (
+          {transactions.map((tx: Transaction) => (
             <div
               key={tx.id}
               style={{
@@ -82,7 +91,7 @@ export default function RecentTransactions() {
                   {tx.description}
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <Pill variant="default">{tx.category?.name || "Uncategorized"}</Pill>
+                  <Pill variant="default">{typeof tx.category === 'string' ? tx.category : tx.category?.name || "Uncategorized"}</Pill>
                   <span style={{ fontSize: 11, color: colors.muted }}>
                     {formatRelativeDate(tx.date)}
                   </span>

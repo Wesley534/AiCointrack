@@ -2,7 +2,6 @@
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
-import { truncateAddress } from "@/lib/format"
 import { useAccount } from "wagmi"
 
 interface DepositSheetProps {

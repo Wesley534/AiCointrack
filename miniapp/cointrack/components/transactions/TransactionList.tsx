@@ -3,8 +3,17 @@ import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import TransactionItem from "./TransactionItem"
 
+interface Transaction {
+  id: string
+  description: string
+  amount: number
+  category: string
+  date: string
+  source: string
+}
+
 interface TransactionListProps {
-  transactions: any[]
+  transactions: Transaction[]
   loading?: boolean
 }
 

@@ -6,6 +6,15 @@ import { useGoals } from "@/hooks/useGoals"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
+interface Goal {
+  id: string
+  name: string
+  icon: string
+  target_amount: number
+  current_amount: number
+  deadline: string
+}
+
 export default function SavingsPage() {
   const { data, isLoading } = useGoals()
   const { theme, setActiveSheet } = useAppStore()
@@ -25,7 +34,7 @@ export default function SavingsPage() {
   const goals = data?.goals || []
   
   // Mock data if no real goals
-  const mockGoals = [
+  const mockGoals: Goal[] = [
     {
       id: "1",
       name: "Emergency Fund",
@@ -53,7 +62,7 @@ export default function SavingsPage() {
   ]
 
   const displayGoals = goals.length > 0 ? goals : mockGoals
-  const totalSaved = displayGoals.reduce((sum: number, goal: any) => sum + goal.current_amount, 0)
+  const totalSaved = displayGoals.reduce((sum: number, goal: Goal) => sum + goal.current_amount, 0)
 
   return (
     <div>
@@ -76,7 +85,7 @@ export default function SavingsPage() {
             Your Goals
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {displayGoals.map((goal: any) => (
+            {displayGoals.map((goal: Goal) => (
               <GoalCard
                 key={goal.id}
                 goal={goal}
