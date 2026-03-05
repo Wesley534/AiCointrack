@@ -15,7 +15,7 @@ export default function BudgetSummaryBar({ spent, budget, currency = "KES" }: Bu
   const colors = theme === "light" ? lightTheme : darkTheme
 
   const remaining = budget - spent
-  const percentage = (spent / budget) * 100
+  const percentage = budget > 0 ? (spent / budget) * 100 : 0
 
   const getStatusColor = () => {
     if (percentage >= 90) return colors.red

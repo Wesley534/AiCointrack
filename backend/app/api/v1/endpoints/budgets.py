@@ -18,7 +18,7 @@ class BudgetUpdate(BaseModel):
     kind: str = None
     month: str = None
 
-@router.post("/", response_model=BudgetResponse)
+@router.post("", response_model=BudgetResponse)
 def create_budget(budget_in: BudgetCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
     budget = Budget(**budget_in.dict(), user_id=current_user.id)
     db.add(budget)
@@ -26,7 +26,7 @@ def create_budget(budget_in: BudgetCreate, db: Session = Depends(get_db), curren
     db.refresh(budget)
     return budget
 
-@router.get("/", response_model=List[BudgetResponse])
+@router.get("", response_model=List[BudgetResponse])
 def get_budgets(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
     return db.query(Budget).filter(Budget.user_id == current_user.id).all()
 
