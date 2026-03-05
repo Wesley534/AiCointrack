@@ -9,13 +9,23 @@ from app.core.deps import get_current_user_jwt
 
 router = APIRouter()
 
+import logging
+logger = logging.getLogger(__name__)
+
 @router.post("", response_model=ShoppingListResponse)
 def create_shopping_list(list_in: ShoppingListCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
-    s_list = ShoppingList(**list_in.dict(), user_id=current_user.id)
-    db.add(s_list)
-    db.commit()
-    db.refresh(s_list)
-    return s_list
+    logger.info(f"===> HIT create_shopping_list POST. Data: {list_in.dict()}, User: {current_user.id}")
+    try:
+        s_list = ShoppingList(**list_in.dict(), user_id=current_user.id)
+        db.add(s_list)
+        db.commit()
+        db.refresh(s_list)
+        logger.info(f"===> Successfully created ShoppingList id={s_list.id}")
+        return s_list
+    except Exception as e:
+        logger.error(f"===> Error creating shopping list: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("", response_model=List[ShoppingListResponse])
 def get_shopping_lists(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):

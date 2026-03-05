@@ -33,17 +33,23 @@ export default function CreateListSheet({ isOpen, onClose, onSuccess }: CreateLi
     setError("")
 
     try {
-      await createShoppingList({
+      const payload = {
         name: name.trim(),
         budget: parseFloat(budget),
-      })
+      }
+      console.log("Creating shopping list with payload:", payload)
+      
+      const response = await createShoppingList(payload)
+      console.log("Shopping list created:", response)
+      
       setName("")
       setBudget("")
       onSuccess()
       onClose()
     } catch (err) {
-      const error = err as { response?: { data?: { detail?: string } } }
-      setError(error.response?.data?.detail || "Failed to create list")
+      console.error("Error creating shopping list:", err)
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      setError(error.response?.data?.detail || error.message || "Failed to create list")
     } finally {
       setLoading(false)
     }
