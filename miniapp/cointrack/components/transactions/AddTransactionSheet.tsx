@@ -51,6 +51,7 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
         source,
         category,
         currency: "KES",
+        transaction_type: type,
       })
 
       // Reset and close

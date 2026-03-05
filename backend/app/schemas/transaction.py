@@ -31,10 +31,9 @@ class OffchainTransactionCreate(BaseModel):
 class OnchainTransactionCreate(BaseModel):
     """For blockchain transactions"""
     amount: float
-    description: str
+    description: Optional[str] = None
     tx_hash: str
     recipient: Optional[str] = None
-    note: Optional[str] = None
     category: Optional[str] = None
     transaction_type: str = "expense"
     currency: str = "USDC"
