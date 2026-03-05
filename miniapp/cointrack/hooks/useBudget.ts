@@ -1,14 +1,19 @@
 import { useQuery } from "@tanstack/react-query"
 import { getCurrentBudget } from "@/lib/api"
+import { useAppStore } from "@/store"
 
 export function useBudget() {
+  const jwt = useAppStore(state => state.jwt)
+
   const query = useQuery({
     queryKey: ["budget"],
     queryFn: async () => {
       const response = await getCurrentBudget()
       return response.data
     },
+    enabled: !!jwt,
     staleTime: 0,
+    refetchOnMount: true,
     refetchInterval: 15000,
   })
 
