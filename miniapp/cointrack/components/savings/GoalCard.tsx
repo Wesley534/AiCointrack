@@ -1,17 +1,19 @@
 "use client"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
-import { formatKes, formatDate } from "@/lib/format"
+import { formatUSD } from "@/lib/format"
 import ProgressBar from "@/components/ui/ProgressBar"
 
 interface GoalCardProps {
   goal: {
     id: string
     name: string
-    icon: string
-    target_amount: number
-    current_amount: number
-    deadline: string
+    icon?: string
+    target_amount?: number
+    target: number
+    current_amount?: number
+    saved: number
+    deadline?: string
   }
   onContribute?: () => void
 }
@@ -20,8 +22,10 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
 
-  const percentage = (goal.current_amount / goal.target_amount) * 100
-  const remaining = goal.target_amount - goal.current_amount
+  const currentAmount = goal.saved || goal.current_amount || 0
+  const targetAmount = goal.target || goal.target_amount || 0
+  const percentage = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0
+  const remaining = targetAmount - currentAmount
 
   return (
     <div
@@ -34,7 +38,7 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
     >
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 32 }}>{goal.icon}</span>
+          {goal.icon && <span style={{ fontSize: 32 }}>{goal.icon}</span>}
           <div>
             <div
               style={{
@@ -46,9 +50,11 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
             >
               {goal.name}
             </div>
-            <div style={{ fontSize: 11, color: colors.muted }}>
-              Target: {formatDate(goal.deadline)}
-            </div>
+            {goal.deadline && (
+              <div style={{ fontSize: 11, color: colors.muted }}>
+                Target: {goal.deadline}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -64,19 +70,19 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
               color: colors.text,
             }}
           >
-            {formatKes(goal.current_amount)} / {formatKes(goal.target_amount)}
+            {formatUSD(currentAmount)} / {formatUSD(targetAmount)}
           </div>
         </div>
         <ProgressBar
-          current={goal.current_amount}
-          total={goal.target_amount}
+          current={currentAmount}
+          total={targetAmount}
           color={theme === "light" ? colors.green : colors.accent}
         />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ fontSize: 13, color: colors.muted }}>
-          {percentage >= 100 ? "🎉 Goal reached!" : `${formatKes(remaining)} to go`}
+          {percentage >= 100 ? "🎉 Goal reached!" : `${formatUSD(remaining)} to go`}
         </div>
         {onContribute && percentage < 100 && (
           <button
@@ -93,7 +99,7 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
               fontFamily: "Syne, sans-serif",
             }}
           >
-            + Add
+            Contribute
           </button>
         )}
       </div>

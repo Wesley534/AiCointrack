@@ -23,6 +23,18 @@ export function formatKes(amount: number): string {
 }
 
 /**
+ * Format USD currency
+ */
+export function formatUSD(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+/**
  * Convert USDC to KES
  */
 export function usdcToKes(usdc: number, rate: number = 130): number {

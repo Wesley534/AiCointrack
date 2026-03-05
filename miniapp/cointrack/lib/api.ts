@@ -86,6 +86,13 @@ export const getCurrentBudget = () =>
 export const getGoals = () =>
   api.get("/api/v1/savings-goals")
 
+export const createGoal = (data: {
+  name: string
+  saved: number
+  target: number
+  monthly: number
+}) => api.post("/api/v1/savings-goals", data)
+
 export const contributeToGoal = (goalId: string, data: {
   amount_usdc: number
   tx_hash: string
