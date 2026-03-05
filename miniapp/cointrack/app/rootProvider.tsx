@@ -17,9 +17,10 @@ export function RootProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        // Don't override per-hook staleTime — set to 0 globally
-        // so hooks with staleTime: 0 always refetch on mount
-        staleTime: 0,
+        // Don't override per-hook staleTime — set a reasonable default
+        // so tabs don't unnecessarily refetch every single time
+        staleTime: 60000,
+        gcTime: 5 * 60000,
         // Don't retry on auth failures — this causes the delayed crash
         retry: false,
         // Always refetch when window regains focus or component mounts

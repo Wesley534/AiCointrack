@@ -14,6 +14,7 @@ export default function Page() {
   const { signMessageAsync } = useSignMessage()
   const { setMiniAppReady } = useMiniKit()
   const { jwt, user, setAuth, logout, theme } = useAppStore()
+  const hasHydrated = useAppStore(state => state._hasHydrated)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
@@ -25,6 +26,7 @@ export default function Page() {
   }, [setMiniAppReady])
 
   useEffect(() => {
+    if (!hasHydrated) return
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
 
     // Already authenticated in store — verify JWT is still valid
@@ -101,7 +103,7 @@ export default function Page() {
         setLoading(false)
       }
     }
-  }, [isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
+  }, [hasHydrated, isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
 
   if (loading) return (
     <div style={{

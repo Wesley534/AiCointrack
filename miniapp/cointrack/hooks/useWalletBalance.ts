@@ -23,6 +23,8 @@ export function useWalletBalance() {
       return { usdc, kes }
     },
     enabled: !!address && !!jwt,
+    staleTime: 60000,
+    gcTime: 5 * 60000,
     refetchOnMount: true,
     refetchInterval: 30000,
   })

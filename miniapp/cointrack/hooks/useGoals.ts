@@ -12,9 +12,10 @@ export function useGoals() {
       return response.data
     },
     enabled: !!jwt,
-    staleTime: 0,
+    staleTime: 60000,
+    gcTime: 5 * 60000,
     refetchOnMount: true,
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   })
 
   return {
