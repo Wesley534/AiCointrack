@@ -10,7 +10,7 @@ export default function BottomNav() {
   const colors = theme === "light" ? lightTheme : darkTheme
 
   const tabs = [
-    { id: "home" as const, href: "/", icon: "🏠", label: "Home" },
+    { id: "home" as const, href: "/dashboard", icon: "🏠", label: "Home" },
     { id: "shopping" as const, href: "/shopping", icon: "🛒", label: "Shopping" },
     { id: "budget" as const, href: "/budget", icon: "📊", label: "Budget" },
     { id: "savings" as const, href: "/savings", icon: "🎯", label: "Goals" },
