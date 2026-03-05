@@ -82,6 +82,26 @@ export const recordOffchainTx = (data: {
 export const getCurrentBudget = () =>
   api.get("/api/v1/budgets/current")
 
+export const getBudgets = () =>
+  api.get("/api/v1/budgets")
+
+export const createBudget = (data: {
+  label: string
+  planned: number
+  tag: string
+  kind: string
+  month: string
+}) => api.post("/api/v1/budgets", data)
+
+export const updateBudget = (budgetId: number, data: {
+  label?: string
+  planned?: number
+  actual?: number
+  tag?: string
+  kind?: string
+  month?: string
+}) => api.put(`/api/v1/budgets/${budgetId}`, data)
+
 // ── SAVINGS ───────────────────────────────────────────
 export const getGoals = () =>
   api.get("/api/v1/savings-goals")
