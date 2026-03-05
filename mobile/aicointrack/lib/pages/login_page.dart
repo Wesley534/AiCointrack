@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/wallet_auth_service.dart';
+import '../services/wallet_connect_service.dart';
 import '../firebase_options.dart';
+import '../config/constants.dart';
 import '../config/theme.dart';
 import 'home_page.dart';
 import 'email_login_page.dart';
@@ -17,6 +20,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
+  bool _isWalletLoading = false;
   String? _errorMessage;
 
   /// Handle Google Sign-In button press
@@ -32,7 +36,8 @@ class _LoginPageState extends State<LoginPage> {
       if (DefaultFirebaseOptions.currentPlatform.apiKey == 'YOUR_API_KEY') {
         if (mounted) {
           setState(() {
-            _errorMessage = 'Firebase not configured yet. Please update firebase_options.dart with your Firebase credentials. See SETUP_CHECKLIST.md for details.';
+            _errorMessage =
+                'Firebase not configured yet. Please update firebase_options.dart with your Firebase credentials. See SETUP_CHECKLIST.md for details.';
             _isLoading = false;
           });
         }
@@ -75,6 +80,45 @@ class _LoginPageState extends State<LoginPage> {
         setState(() {
           _errorMessage = 'An unexpected error occurred: $e';
           _isLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Handle Base Wallet sign-in via WalletConnect
+  Future<void> _handleBaseWalletSignIn() async {
+    if (AppConstants.WALLETCONNECT_PROJECT_ID ==
+        'YOUR_WALLETCONNECT_PROJECT_ID') {
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'WalletConnect not configured. Add WALLETCONNECT_PROJECT_ID in constants.dart. '
+              'Get a free project ID at cloud.walletconnect.com';
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _isWalletLoading = true;
+    });
+
+    try {
+      final walletAuth = WalletAuthService();
+      await walletAuth.loginWithWallet();
+
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+          _isWalletLoading = false;
         });
       }
     }
@@ -139,10 +183,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 child: const Center(
-                  child: Text(
-                    '💰',
-                    style: TextStyle(fontSize: 40),
-                  ),
+                  child: Text('💰', style: TextStyle(fontSize: 40)),
                 ),
               ),
 
@@ -165,11 +206,7 @@ class _LoginPageState extends State<LoginPage> {
               // Subtitle
               Text(
                 'Your AI-powered money companion\n— tracks every shilling, automatically.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: mutedColor,
-                  height: 1.5,
-                ),
+                style: TextStyle(fontSize: 14, color: mutedColor, height: 1.5),
                 textAlign: TextAlign.center,
               ),
 
@@ -214,7 +251,9 @@ class _LoginPageState extends State<LoginPage> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    disabledBackgroundColor: AppColors.accentGreen.withOpacity(0.5),
+                    disabledBackgroundColor: AppColors.accentGreen.withOpacity(
+                      0.5,
+                    ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -222,7 +261,9 @@ class _LoginPageState extends State<LoginPage> {
                           width: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.black,
+                            ),
                           ),
                         )
                       : const Text(
@@ -253,10 +294,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: const Text(
                     'Sign in with Google',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                 ),
               ),
@@ -289,41 +327,20 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   child: const Text(
                     'Sign in with email',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                 ),
               ),
 
               const SizedBox(height: 12),
-              // Continue with Base Wallet
+              // Sign in with Base Wallet (WalletConnect)
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: OutlinedButton.icon(
-                  onPressed: _isLoading
+                  onPressed: (_isLoading || _isWalletLoading)
                       ? null
-                      : () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Base Wallet'),
-                              content: const Text(
-                                'To sign in with your Base wallet, open CoinTrack '
-                                'inside the Base app miniapp. After signing in there, '
-                                'you can use your wallet to access the full app here.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('OK'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                      : _handleBaseWalletSignIn,
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     foregroundColor: mutedColor,
@@ -334,10 +351,18 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  icon: const Icon(Icons.account_balance_wallet, size: 20),
-                  label: const Text(
-                    'Continue with Base Wallet',
-                    style: TextStyle(
+                  icon: _isWalletLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.account_balance_wallet, size: 20),
+                  label: Text(
+                    _isWalletLoading
+                        ? 'Waiting for Base app...'
+                        : 'Sign in with Base Wallet',
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -349,7 +374,10 @@ class _LoginPageState extends State<LoginPage> {
 
               // Base Chain Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.accentGreen.withOpacity(0.08),
                   border: Border.all(
@@ -372,10 +400,7 @@ class _LoginPageState extends State<LoginPage> {
                     Expanded(
                       child: Text(
                         'Powered by Firebase — your data is secure',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: mutedColor,
-                        ),
+                        style: TextStyle(fontSize: 11, color: mutedColor),
                       ),
                     ),
                   ],

@@ -84,6 +84,35 @@ class ApiService {
     return data;
   }
 
+  /// Create Privy embedded wallet for user (email signup).
+  static Future<Map<String, dynamic>> createWallet() async {
+    final jwt = await TokenService.getJwt();
+    if (jwt == null) throw Exception('Not signed in');
+
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/auth/create-wallet'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $jwt',
+          },
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      final body = response.body;
+      throw Exception(
+        response.statusCode == 400 || response.statusCode == 503
+            ? (jsonDecode(body)['detail'] ?? body)
+            : 'Wallet creation failed',
+      );
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   /// Link wallet to existing account. Requires Firebase token.
   static Future<Map<String, dynamic>> linkWallet({
     required String firebaseToken,

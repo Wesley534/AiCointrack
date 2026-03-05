@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/token_service.dart';
 import '../config/theme.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
@@ -28,54 +29,66 @@ class _HomePageState extends State<HomePage> {
     _registerUserWithBackend();
   }
 
-  /// Register user with backend using Firebase ID token
-  /// On success, automatically navigate to Dashboard
+  /// Register or fetch user: Firebase path or JWT path (wallet-only).
   Future<void> _registerUserWithBackend() async {
     try {
-      final token = await AuthService.getIdToken();
+      final firebaseToken = await AuthService.getIdToken();
+      final jwt = await TokenService.getJwt();
 
-      if (token != null) {
-        // Call backend to register user
-        final backendResponse = await ApiService.registerUserWithBackend();
+      Map<String, dynamic> backendResponse;
+      if (firebaseToken != null) {
+        backendResponse = await ApiService.registerUserWithBackend();
+      } else if (jwt != null && jwt.isNotEmpty) {
+        backendResponse = await ApiService.fetchUserProfile();
+      } else {
+        return;
+      }
 
-        if (mounted) {
-          final userData = backendResponse['user'] ?? backendResponse;
-          final normalizedUserData = userData is Map<String, dynamic>
-              ? userData
-              : userData is Map
-              ? Map<String, dynamic>.from(userData)
-              : null;
-          final hasWallet =
-              userData is Map &&
-              userData['wallet_address'] != null &&
-              (userData['wallet_address'] as String).isNotEmpty;
+      if (mounted) {
+        final userData = backendResponse['user'] ?? backendResponse;
+        final normalizedUserData = userData is Map<String, dynamic>
+            ? userData
+            : userData is Map
+            ? Map<String, dynamic>.from(userData)
+            : null;
+        final hasWallet =
+            userData is Map &&
+            userData['wallet_address'] != null &&
+            (userData['wallet_address'] as String).isNotEmpty;
 
-          if (!hasWallet) {
-            // Show wallet linking options
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => WalletOptionsPage(
-                  userName: _user?.displayName ?? 'User',
-                  userEmail: _user?.email ?? '',
-                  photoUrl: _user?.photoURL,
-                  userData: normalizedUserData,
-                ),
+        final displayName =
+            _user?.displayName ??
+            (userData is Map ? userData['name'] as String? : null) ??
+            'User';
+        final email =
+            _user?.email ??
+            (userData is Map ? userData['email'] as String? : null) ??
+            '';
+
+        if (!hasWallet) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => WalletOptionsPage(
+                userName: displayName,
+                userEmail: email,
+                photoUrl: _user?.photoURL,
+                userData: normalizedUserData,
               ),
-              (route) => false,
-            );
-          } else {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(
-                builder: (context) => DashboardPage(
-                  userName: _user?.displayName ?? 'User',
-                  userEmail: _user?.email ?? '',
-                  photoUrl: _user?.photoURL,
-                  userData: normalizedUserData,
-                ),
+            ),
+            (route) => false,
+          );
+        } else {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => DashboardPage(
+                userName: displayName,
+                userEmail: email,
+                photoUrl: _user?.photoURL,
+                userData: normalizedUserData,
               ),
-              (route) => false,
-            );
-          }
+            ),
+            (route) => false,
+          );
         }
       }
     } catch (e) {

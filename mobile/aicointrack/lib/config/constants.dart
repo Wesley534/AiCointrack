@@ -19,6 +19,9 @@ class AppConstants {
   static const String FIREBASE_VERIFY_ENDPOINT = '/api/v1/auth/firebase/verify';
   static const String PROFILE_ENDPOINT = '/api/v1/auth/profile';
   
+  // WalletConnect — get free project ID from cloud.walletconnect.com
+  static const String WALLETCONNECT_PROJECT_ID = 'fec5e6d06b78f02fa5ed0d0cd883b8e5';
+
   // App Configuration
   static const String APP_NAME = 'CoinTrack';
   static const String APP_VERSION = '1.0.0';

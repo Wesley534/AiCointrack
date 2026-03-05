@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     BASE_RPC_URL: str
     HF_API_KEY: str
 
+    # Privy (embedded wallets for email/password users)
+    PRIVY_APP_ID: str = ""
+    PRIVY_APP_SECRET: str = ""  # Set in .env; required for wallet creation
+
     # Firebase Configuration
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_CREDENTIALS_PATH: str = ""
