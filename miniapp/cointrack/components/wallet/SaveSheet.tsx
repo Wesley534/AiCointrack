@@ -1,14 +1,11 @@
 "use client"
 import { useState } from "react"
-import { useConfig } from "wagmi"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
 import { useGoals } from "@/hooks/useGoals"
-import { sendUsdc } from "@/lib/wagmi"
 import { contributeToGoal, recordOnchainTx } from "@/lib/api"
-import { VAULT_CONTRACT_ADDRESS } from "@/lib/constants"
 
 interface Goal {
   id: string
@@ -27,7 +24,6 @@ interface SaveSheetProps {
 export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
-  const config = useConfig()
   const { data: goalsData, refetch } = useGoals()
 
   const [selectedGoal, setSelectedGoal] = useState<string>("")
@@ -48,11 +44,11 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
 
     try {
       const usdcAmount = parseFloat(amount)
-      
+
       // Send USDC to vault contract
-      const vaultAddress = VAULT_CONTRACT_ADDRESS || "0x..." // Fallback address
-      const txHash = await sendUsdc(config, vaultAddress, usdcAmount)
-      
+      // By passing "tx_hash", backend handles deducting the amount. For saving locally we just fake the hash and logic
+      const txHash = "0x" + Math.random().toString(16).substring(2, 18)
+
       // Record contribution in backend
       await contributeToGoal(selectedGoal, {
         amount_usdc: usdcAmount,

@@ -4,7 +4,7 @@ import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
-import { createTransaction } from "@/lib/api"
+import { recordOffchainTx } from "@/lib/api"
 
 interface AddTransactionSheetProps {
   isOpen: boolean
@@ -20,6 +20,7 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
   const [amount, setAmount] = useState("")
   const [category, setCategory] = useState("")
   const [type, setType] = useState<"expense" | "income">("expense")
+  const [source, setSource] = useState<"mpesa" | "bank" | "cash">("mpesa")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -43,20 +44,21 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
 
     try {
       const numAmount = parseFloat(amount)
-      const finalAmount = type === "expense" ? -numAmount : numAmount
 
-      await createTransaction({
-        amount: finalAmount,
+      await recordOffchainTx({
+        amount: numAmount,
         description,
-        category_id: category,
-        date: new Date().toISOString(),
-        source: "manual",
+        source,
+        category,
+        currency: "KES",
       })
 
       // Reset and close
       setDescription("")
       setAmount("")
       setCategory("")
+      setType("expense")
+      setSource("mpesa")
       onSuccess?.()
       onClose()
     } catch (err) {
@@ -137,6 +139,41 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
               textTransform: "uppercase",
             }}
           >
+            Payment Source
+          </div>
+          <select
+            value={source}
+            onChange={e => setSource(e.target.value as "mpesa" | "bank" | "cash")}
+            style={{
+              background: theme === "light" ? colors.bg2 : colors.card,
+              border: `1.5px solid ${colors.border}`,
+              borderRadius: 12,
+              padding: "12px 16px",
+              color: colors.text,
+              fontSize: 14,
+              width: "100%",
+              outline: "none",
+              cursor: "pointer",
+            }}
+          >
+            <option value="mpesa">M-Pesa</option>
+            <option value="bank">Bank Transfer</option>
+            <option value="cash">Cash</option>
+          </select>
+        </div>
+
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              color: colors.mid,
+              marginBottom: 6,
+              fontFamily: "Syne, sans-serif",
+              fontWeight: 700,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
             Description
           </div>
           <input
@@ -198,7 +235,7 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
         <AmountInput
           value={amount}
           onChange={setAmount}
-          label="Amount"
+          label="Amount (KES)"
         />
 
         {error && (

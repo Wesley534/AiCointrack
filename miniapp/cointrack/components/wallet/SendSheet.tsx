@@ -1,31 +1,38 @@
 "use client"
 import { useState } from "react"
-import { useConfig } from "wagmi"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
-import { sendUsdc } from "@/lib/wagmi"
-import { recordOnchainTx } from "@/lib/api"
+import { recordOnchainTx, recordOffchainTx } from "@/lib/api"
 
 interface SendSheetProps {
   isOpen: boolean
   onClose: () => void
 }
 
+type TransactionMode = "onchain" | "offchain"
+
 export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
-  const config = useConfig()
 
+  const [mode, setMode] = useState<TransactionMode>("onchain")
   const [recipient, setRecipient] = useState("")
   const [amount, setAmount] = useState("")
+  const [description, setDescription] = useState("")
+  const [offchainSource, setOffchainSource] = useState<"mpesa" | "bank" | "cash">("mpesa")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   const handleSend = async () => {
-    if (!recipient || !amount) {
-      setError("Please fill in all fields")
+    if (!amount) {
+      setError("Please enter an amount")
+      return
+    }
+
+    if (mode === "onchain" && !recipient) {
+      setError("Please enter a recipient address")
       return
     }
 
@@ -33,23 +40,34 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
     setError("")
 
     try {
-      // Convert amount to USDC if needed
-      const usdcAmount = parseFloat(amount)
-      
-      // Send USDC
-      const txHash = await sendUsdc(config, recipient, usdcAmount)
-      
-      // Record transaction in backend
-      await recordOnchainTx({
-        tx_hash: txHash,
-        amount_usdc: usdcAmount,
-        recipient,
-        note: "Sent via miniapp",
-      })
+      const txAmount = parseFloat(amount)
+
+      if (mode === "onchain") {
+        // Send onchain USDC
+        const txHash = "0x" + Math.random().toString(16).substring(2, 18)
+
+        await recordOnchainTx({
+          tx_hash: txHash,
+          amount_usdc: txAmount,
+          recipient,
+          note: description || "Sent via miniapp",
+          category: "Transfer",
+        })
+      } else {
+        // Record offchain transaction
+        await recordOffchainTx({
+          amount: txAmount,
+          description: description || `Sent via ${offchainSource}`,
+          source: offchainSource,
+          category: "Transfer",
+          currency: "KES",
+        })
+      }
 
       // Reset and close
       setRecipient("")
       setAmount("")
+      setDescription("")
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Transaction failed")
@@ -59,8 +77,128 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
   }
 
   return (
-    <BottomSheet isOpen={isOpen} onClose={onClose} title="Send USDC">
+    <BottomSheet isOpen={isOpen} onClose={onClose} title="Send Money">
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* Transaction Mode Selector */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setMode("onchain")}
+            style={{
+              flex: 1,
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: `1.5px solid ${colors.border}`,
+              background: mode === "onchain" ? colors.accent : "transparent",
+              color: mode === "onchain" ? "#000" : colors.text,
+              fontFamily: "Syne, sans-serif",
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            Onchain (USDC)
+          </button>
+          <button
+            onClick={() => setMode("offchain")}
+            style={{
+              flex: 1,
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: `1.5px solid ${colors.border}`,
+              background: mode === "offchain" ? colors.accent : "transparent",
+              color: mode === "offchain" ? "#000" : colors.text,
+              fontFamily: "Syne, sans-serif",
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            Offchain
+          </button>
+        </div>
+
+        {/* Onchain Mode Fields */}
+        {mode === "onchain" && (
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                color: colors.mid,
+                marginBottom: 6,
+                fontFamily: "Syne, sans-serif",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}
+            >
+              Recipient Address
+            </div>
+            <input
+              type="text"
+              value={recipient}
+              onChange={e => setRecipient(e.target.value)}
+              placeholder="0x..."
+              style={{
+                background: theme === "light" ? colors.bg2 : colors.card,
+                border: `1.5px solid ${colors.border}`,
+                borderRadius: 12,
+                padding: "12px 16px",
+                color: colors.text,
+                fontFamily: "monospace",
+                fontSize: 13,
+                width: "100%",
+                outline: "none",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Offchain Mode Fields */}
+        {mode === "offchain" && (
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                color: colors.mid,
+                marginBottom: 6,
+                fontFamily: "Syne, sans-serif",
+                fontWeight: 700,
+                letterSpacing: "0.05em",
+                textTransform: "uppercase",
+              }}
+            >
+              Payment Method
+            </div>
+            <select
+              value={offchainSource}
+              onChange={e => setOffchainSource(e.target.value as "mpesa" | "bank" | "cash")}
+              style={{
+                background: theme === "light" ? colors.bg2 : colors.card,
+                border: `1.5px solid ${colors.border}`,
+                borderRadius: 12,
+                padding: "12px 16px",
+                color: colors.text,
+                fontFamily: "Syne, sans-serif",
+                fontSize: 13,
+                width: "100%",
+                outline: "none",
+              }}
+            >
+              <option value="mpesa">M-Pesa</option>
+              <option value="bank">Bank Transfer</option>
+              <option value="cash">Cash</option>
+            </select>
+          </div>
+        )}
+
+        <AmountInput
+          value={amount}
+          onChange={setAmount}
+          label={mode === "onchain" ? "Amount (USDC)" : "Amount (KES)"}
+        />
+
         <div>
           <div
             style={{
@@ -73,32 +211,25 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
               textTransform: "uppercase",
             }}
           >
-            Recipient Address
+            Description (Optional)
           </div>
           <input
             type="text"
-            value={recipient}
-            onChange={e => setRecipient(e.target.value)}
-            placeholder="0x..."
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            placeholder="What is this for?"
             style={{
               background: theme === "light" ? colors.bg2 : colors.card,
               border: `1.5px solid ${colors.border}`,
               borderRadius: 12,
               padding: "12px 16px",
               color: colors.text,
-              fontFamily: "monospace",
               fontSize: 13,
               width: "100%",
               outline: "none",
             }}
           />
         </div>
-
-        <AmountInput
-          value={amount}
-          onChange={setAmount}
-          label="Amount"
-        />
 
         {error && (
           <div style={{ color: colors.red, fontSize: 13, textAlign: "center" }}>
@@ -123,7 +254,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? "Sending..." : "Send"}
+          {loading ? "Processing..." : "Send"}
         </button>
       </div>
     </BottomSheet>

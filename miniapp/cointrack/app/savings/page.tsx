@@ -32,36 +32,9 @@ export default function SavingsPage() {
   }
 
   const goals = data?.goals || []
-  
-  // Mock data if no real goals
-  const mockGoals: Goal[] = [
-    {
-      id: "1",
-      name: "Emergency Fund",
-      icon: "🛡️",
-      target_amount: 50000,
-      current_amount: 30000,
-      deadline: "2026-06-30",
-    },
-    {
-      id: "2",
-      name: "New Phone",
-      icon: "📱",
-      target_amount: 40000,
-      current_amount: 15000,
-      deadline: "2026-05-15",
-    },
-    {
-      id: "3",
-      name: "Vacation",
-      icon: "✈️",
-      target_amount: 80000,
-      current_amount: 25000,
-      deadline: "2026-12-01",
-    },
-  ]
 
-  const displayGoals = goals.length > 0 ? goals : mockGoals
+  // Fetch from DB
+  const displayGoals = goals.length > 0 ? goals : []
   const totalSaved = displayGoals.reduce((sum: number, goal: Goal) => sum + goal.current_amount, 0)
 
   return (

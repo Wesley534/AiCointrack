@@ -33,16 +33,7 @@ export default function BudgetPage() {
   const budget = data?.budget || {}
   const categories = data?.categories || []
 
-  // Mock data if no real data
-  const mockCategories: Category[] = [
-    { name: "Food & Dining", icon: "🍽️", spent: 15000, budget: 20000, type: "need" as const },
-    { name: "Transport", icon: "🚗", spent: 8000, budget: 10000, type: "need" as const },
-    { name: "Shopping", icon: "🛍️", spent: 12000, budget: 15000, type: "want" as const },
-    { name: "Entertainment", icon: "🎬", spent: 5000, budget: 8000, type: "want" as const },
-    { name: "Savings", icon: "💰", spent: 10000, budget: 15000, type: "save" as const },
-  ]
-
-  const displayCategories = categories.length > 0 ? categories : mockCategories
+  const displayCategories = categories.length > 0 ? categories : []
 
   return (
     <div>
