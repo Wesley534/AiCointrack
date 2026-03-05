@@ -25,23 +25,23 @@ export const getMe = () =>
 
 // ── HOME ──────────────────────────────────────────────
 export const getHomeData = () =>
-  api.get("/miniapp/home")
+  api.get("/api/v1/dashboard/miniapp")
 
 // ── WALLET ────────────────────────────────────────────
 export const getWalletAddress = () =>
-  api.get("/wallet/address")
+  api.get("/api/v1/wallet/address")
 
 export const getWithdrawDestinations = () =>
-  api.get("/withdraw/destinations")
+  api.get("/api/v1/wallet/destinations")
 
 export const initiateWithdrawal = (data: {
   amount_usdc: number
   destination_type: "mpesa" | "bank"
   destination_id: string
-}) => api.post("/withdraw/initiate", data)
+}) => api.post("/api/v1/wallet/withdraw/initiate", data)
 
 export const getWithdrawalStatus = (id: string) =>
-  api.get(`/withdraw/${id}/status`)
+  api.get(`/api/v1/wallet/withdraw/${id}/status`)
 
 export const recordOnchainTx = (data: {
   tx_hash: string
@@ -49,20 +49,20 @@ export const recordOnchainTx = (data: {
   recipient?: string
   note?: string
   category?: string
-}) => api.post("/transactions/record", data)
+}) => api.post("/api/v1/transactions/record", data)
 
 // ── BUDGET ────────────────────────────────────────────
 export const getCurrentBudget = () =>
-  api.get("/budget/current")
+  api.get("/api/v1/budgets/current")
 
 // ── SAVINGS ───────────────────────────────────────────
 export const getGoals = () =>
-  api.get("/goals")
+  api.get("/api/v1/savings-goals")
 
 export const contributeToGoal = (goalId: string, data: {
   amount_usdc: number
   tx_hash: string
-}) => api.post(`/goals/${goalId}/contribute`, data)
+}) => api.post(`/api/v1/savings-goals/${goalId}/contribute`, data)
 
 // ── TRANSACTIONS ──────────────────────────────────────
 export const getTransactions = (params?: {
@@ -70,16 +70,17 @@ export const getTransactions = (params?: {
   offset?: number
   source?: string
   month?: string
-}) => api.get("/transactions", { params })
+}) => api.get("/api/v1/transactions", { params })
 
 export const createTransaction = (data: {
   amount: number
   description: string
-  category_id: string
+  category_id?: string
   date: string
   source: "manual"
   note?: string
-}) => api.post("/transaction", data)
+  currency?: string
+}) => api.post("/api/v1/transactions/", data)
 
 export const categorizeWithAI = (description: string, amount: number) =>
-  api.post("/ai/categorize", { description, amount })
+  api.post("/api/v1/transactions/ai-categorize", { description, amount })
