@@ -94,7 +94,7 @@ export const getTransactions = (params?: {
   offset?: number
   source?: string
   month?: string
-}) => api.get("/api/v1/transactions", { params })
+}) => api.get("/api/v1/transactions/", { params })
 
 export const createTransaction = (data: {
   amount: number

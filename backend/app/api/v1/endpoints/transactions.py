@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -21,27 +21,7 @@ class AICategorizeRequest(BaseModel):
     description: str
     amount: float
 
-@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
-def create_transaction(
-    tx_in: TransactionCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_jwt)
-):
-    """Create a generic transaction (legacy endpoint)"""
-    tx = Transaction(
-        user_id=current_user.id,
-        amount=tx_in.amount,
-        description=tx_in.description,
-        source=tx_in.source,
-        currency=tx_in.currency,
-        category=tx_in.category,
-        transaction_type=tx_in.transaction_type,
-    )
-    db.add(tx)
-    db.commit()
-    db.refresh(tx)
-    return tx
-
+# POST routes first (more specific)
 @router.post("/offchain", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_offchain_transaction(
     tx_in: OffchainTransactionCreate,
@@ -95,27 +75,34 @@ def create_onchain_transaction(
     db.refresh(tx)
     return tx
 
-@router.get("/", response_model=List[TransactionResponse])
-def list_transactions(
-    source: str = None,
-    transaction_type: str = None,
-    limit: int = 50,
-    offset: int = 0,
+@router.post("/ai-categorize")
+def ai_categorize(req: AICategorizeRequest, current_user: User = Depends(get_current_user_jwt)):
+    """Mock AI response for categorizing transactions"""
+    category = "Food" if "grocery" in req.description.lower() else "Entertainment"
+    return {"category": category, "confidence": 0.9}
+
+@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_transaction(
+    tx_in: TransactionCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_jwt)
 ):
-    """List transactions with optional filtering"""
-    query = db.query(Transaction).filter(Transaction.user_id == current_user.id)
-    
-    if source:
-        query = query.filter(Transaction.source == source)
-    
-    if transaction_type:
-        query = query.filter(Transaction.transaction_type == transaction_type)
-    
-    txs = query.order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
-    return txs
+    """Create a generic transaction (legacy endpoint)"""
+    tx = Transaction(
+        user_id=current_user.id,
+        amount=tx_in.amount,
+        description=tx_in.description,
+        source=tx_in.source,
+        currency=tx_in.currency,
+        category=tx_in.category,
+        transaction_type=tx_in.transaction_type,
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+    return tx
 
+# GET routes (less specific)
 @router.get("/{tx_id}", response_model=TransactionResponse)
 def get_transaction(
     tx_id: int,
@@ -133,8 +120,23 @@ def get_transaction(
     
     return tx
 
-@router.post("/ai-categorize")
-def ai_categorize(req: AICategorizeRequest, current_user: User = Depends(get_current_user_jwt)):
-    """Mock AI response for categorizing transactions"""
-    category = "Food" if "grocery" in req.description.lower() else "Entertainment"
-    return {"category": category, "confidence": 0.9}
+@router.get("/", response_model=List[TransactionResponse])
+def list_transactions(
+    source: Optional[str] = Query(None),
+    transaction_type: Optional[str] = Query(None),
+    limit: int = Query(50),
+    offset: int = Query(0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_jwt)
+):
+    """List transactions with optional filtering"""
+    query = db.query(Transaction).filter(Transaction.user_id == current_user.id)
+    
+    if source:
+        query = query.filter(Transaction.source == source)
+    
+    if transaction_type:
+        query = query.filter(Transaction.transaction_type == transaction_type)
+    
+    txs = query.order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
+    return txs
