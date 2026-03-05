@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import '../services/api_service.dart';
 import 'dashboard_page.dart';
 
 /// Shown after registration when user has no wallet.
-/// Options: Connect existing Base wallet, Create one, Skip.
-class WalletOptionsPage extends StatelessWidget {
+/// Options: Connect existing Base wallet, Create one (Privy), Skip.
+class WalletOptionsPage extends StatefulWidget {
   final String userName;
   final String userEmail;
   final String? photoUrl;
@@ -19,26 +20,62 @@ class WalletOptionsPage extends StatelessWidget {
   });
 
   @override
+  State<WalletOptionsPage> createState() => _WalletOptionsPageState();
+}
+
+class _WalletOptionsPageState extends State<WalletOptionsPage> {
+  bool _isCreatingWallet = false;
+
+  void goToDashboard([Map<String, dynamic>? updatedUserData]) {
+    final userData = updatedUserData ?? widget.userData;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => DashboardPage(
+          userName: widget.userName,
+          userEmail: widget.userEmail,
+          photoUrl: widget.photoUrl,
+          userData: userData,
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
+  Future<void> _createPrivyWallet() async {
+    if (_isCreatingWallet) return;
+    setState(() => _isCreatingWallet = true);
+    try {
+      final result = await ApiService.createWallet();
+      final user = result['user'] as Map<String, dynamic>?;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wallet created! You can export it later in Settings.'),
+            backgroundColor: AppColors.accentGreen,
+          ),
+        );
+        goToDashboard(user);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isCreatingWallet = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
     final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-
-    void goToDashboard() {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => DashboardPage(
-            userName: userName,
-            userEmail: userEmail,
-            photoUrl: photoUrl,
-            userData: userData,
-          ),
-        ),
-        (route) => false,
-      );
-    }
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -91,21 +128,20 @@ class WalletOptionsPage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Create one
+              // Create one (Privy)
               _OptionCard(
                 icon: Icons.add_circle_outline,
                 title: 'Create one for me',
-                subtitle: 'We\'ll set up a wallet for you',
+                subtitle: 'We\'ll set up a Base wallet (exportable to Base app)',
                 borderColor: borderColor,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Smart wallet creation coming soon. Use Base miniapp for now.',
-                      ),
-                    ),
-                  );
-                },
+                onTap: _isCreatingWallet ? null : _createPrivyWallet,
+                trailing: _isCreatingWallet
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
               ),
               const SizedBox(height: 24),
 
@@ -156,14 +192,16 @@ class _OptionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Color borderColor;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final Widget? trailing;
 
   const _OptionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.borderColor,
-    required this.onTap,
+    this.onTap,
+    this.trailing,
   });
 
   @override
@@ -207,7 +245,7 @@ class _OptionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              if (trailing != null) trailing! else const Icon(Icons.chevron_right),
             ],
           ),
         ),

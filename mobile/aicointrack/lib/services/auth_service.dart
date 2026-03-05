@@ -99,6 +99,18 @@ class AuthService {
     return _firebaseAuth.authStateChanges();
   }
 
+  /// App-level auth stream: true when signed in via Firebase or JWT (wallet-only).
+  static Stream<bool> appAuthStateChanges() async* {
+    await for (final user in _firebaseAuth.authStateChanges()) {
+      if (user != null) {
+        yield true;
+      } else {
+        final jwt = await TokenService.getJwt();
+        yield jwt != null && jwt.isNotEmpty;
+      }
+    }
+  }
+
   /// Sign in with email and password
   static Future<UserCredential> signInWithEmail({
     required String email,

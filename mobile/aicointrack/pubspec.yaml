@@ -47,6 +47,12 @@ dependencies:
   # Secure storage for JWT
   shared_preferences: ^2.3.3
 
+  # WalletConnect (Base app sign-in)
+  walletconnect_flutter_v2: ^2.0.14
+  url_launcher: ^6.3.1
+  coinbase_wallet_sdk: ^1.0.10
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

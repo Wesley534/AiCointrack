@@ -65,6 +65,10 @@ auth_providers     # ["google"], ["email"], ["wallet"]
 - Run migration: `alembic upgrade head`
 - Firebase service account needed for `create_custom_token` (wallet → Flutter flow)
 - Enable Email/Password and Google in Firebase Console
+- **Privy (embedded wallets for email signup)**:
+  - Set `PRIVY_APP_ID` and `PRIVY_APP_SECRET` in `.env`
+  - New email/Google users get a Privy-managed Base wallet automatically
+  - Users can export the wallet later (privy_user_id stored)
 - **Base Account (ERC-6492)** — if wallet verify fails for smart wallets:
   - `cd backend/scripts && npm install`
   - Ensure `node` is on PATH; verification will fall back to Viem

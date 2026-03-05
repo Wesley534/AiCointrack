@@ -15,6 +15,7 @@ import secrets
 
 from app.core.siwe_verify import verify_siwe_signature
 from app.core.deps import get_current_user_jwt
+from app.services.privy_service import create_user_with_wallet as privy_create_user_with_wallet
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.token import Token
@@ -82,6 +83,8 @@ def _user_to_dict(user: User) -> dict:
         "display_name": user.display_name,
         "photo_url": user.photo_url,
         "wallet_address": user.wallet_address,
+        "privy_user_id": getattr(user, "privy_user_id", None),
+        "wallet_type": getattr(user, "wallet_type", None),
         "auth_providers": user.auth_providers or [],
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
@@ -163,6 +166,20 @@ async def register_with_firebase(
             # Create new user
             firebase_provider = (decoded_token.get("firebase") or {}).get("sign_in_provider") or ""
             provider_name = "google" if "google" in str(firebase_provider).lower() else "email"
+
+            privy_user_id = None
+            wallet_address = None
+            wallet_created_by_system = False
+            wallet_type = None
+
+            if email:
+                try:
+                    privy_user_id, wallet_address = privy_create_user_with_wallet(email)
+                    wallet_created_by_system = True
+                    wallet_type = "privy_managed"
+                except Exception as e:
+                    logger.warning(f"Privy wallet creation skipped: {e}")
+
             new_user = User(
                 firebase_uid=firebase_uid,
                 email=email,
@@ -170,6 +187,10 @@ async def register_with_firebase(
                 photo_url=photo_url,
                 full_name=display_name,
                 auth_providers=[provider_name],
+                wallet_address=wallet_address,
+                wallet_created_by_system=wallet_created_by_system,
+                privy_user_id=privy_user_id,
+                wallet_type=wallet_type,
             )
             try:
                 db.add(new_user)
@@ -419,10 +440,35 @@ async def create_wallet_for_user(
             detail="User already has a wallet. Use link-wallet for existing wallet.",
         )
 
-    # Placeholder: in production, call Privy or Coinbase Smart Wallet SDK
-    raise HTTPException(
-        status_code=501,
-        detail="Create wallet not yet implemented. Integrate Privy or Coinbase Smart Wallet SDK.",
+    if not user.email:
+        raise HTTPException(
+            status_code=400,
+            detail="Email required to create Privy wallet. Link an email account first.",
+        )
+
+    try:
+        privy_user_id, wallet_address = privy_create_user_with_wallet(user.email)
+    except ValueError as e:
+        if "PRIVY" in str(e):
+            raise HTTPException(
+                status_code=503,
+                detail="Wallet creation not configured. Set PRIVY_APP_ID and PRIVY_APP_SECRET.",
+            )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Privy wallet creation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail="Wallet creation failed. Try again.")
+
+    user.wallet_address = wallet_address.lower()
+    user.wallet_created_by_system = True
+    user.privy_user_id = privy_user_id
+    user.wallet_type = "privy_managed"
+    db.commit()
+    db.refresh(user)
+
+    return CreateWalletResponse(
+        wallet_address=user.wallet_address,
+        user=_user_to_dict(user),
     )
 
 
