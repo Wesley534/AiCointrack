@@ -17,8 +17,14 @@ export function RootProvider({ children }: { children: ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 30_000,
-        retry: 2
+        // Don't override per-hook staleTime — set to 0 globally
+        // so hooks with staleTime: 0 always refetch on mount
+        staleTime: 0,
+        // Don't retry on auth failures — this causes the delayed crash
+        retry: false,
+        // Always refetch when window regains focus or component mounts
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
       }
     }
   }));
