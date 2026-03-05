@@ -7,6 +7,7 @@ from app.db.base import Base
 
 
 class SourceType(enum.Enum):
+    """Values are lowercase for VARCHAR storage and backward compatibility with existing rows."""
     MPESA = "mpesa"
     BANK = "bank"
     CASH = "cash"
@@ -14,6 +15,7 @@ class SourceType(enum.Enum):
 
 
 class TransactionType(enum.Enum):
+    """Values match DB enum 'transactiontype' (lowercase)."""
     EXPENSE = "expense"  # Money going out
     INCOME = "income"    # Money coming in
 
@@ -27,8 +29,8 @@ class Transaction(Base):
     currency = Column(String(10), default="KES")
     description = Column(String(255))
     category = Column(String(100))
-    source = Column(Enum(SourceType), nullable=False)
-    transaction_type = Column(Enum(TransactionType), default=TransactionType.EXPENSE)
+    source = Column(String(20), nullable=False)  # mpesa, bank, cash, onchain — avoid Enum/DB mismatch
+    transaction_type = Column(String(20), default="expense")  # expense, income
     
     # For onchain transactions
     tx_hash = Column(String(255), nullable=True)
