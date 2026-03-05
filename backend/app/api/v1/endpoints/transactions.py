@@ -8,16 +8,14 @@ from app.db.session import get_db
 from app.models.transaction import Transaction
 from app.models.user import User
 from app.core.deps import get_current_user_jwt
-from app.schemas.transaction import TransactionCreate, TransactionResponse
+from app.schemas.transaction import (
+    TransactionCreate, 
+    TransactionResponse, 
+    OffchainTransactionCreate,
+    OnchainTransactionCreate
+)
 
 router = APIRouter()
-
-class RecordTxRequest(BaseModel):
-    tx_hash: str
-    amount_usdc: float
-    recipient: str = None
-    note: str = None
-    category: str = None
 
 class AICategorizeRequest(BaseModel):
     description: str
@@ -29,12 +27,68 @@ def create_transaction(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_jwt)
 ):
+    """Create a generic transaction (legacy endpoint)"""
     tx = Transaction(
         user_id=current_user.id,
         amount=tx_in.amount,
         description=tx_in.description,
         source=tx_in.source,
         currency=tx_in.currency,
+        category=tx_in.category,
+        transaction_type=tx_in.transaction_type,
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+@router.post("/offchain", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_offchain_transaction(
+    tx_in: OffchainTransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_jwt)
+):
+    """
+    Record an offchain transaction (MPESA, cash, bank transfer, etc.)
+    These are recorded in the database for tracking purposes.
+    """
+    tx = Transaction(
+        user_id=current_user.id,
+        amount=tx_in.amount,
+        description=tx_in.description,
+        source=tx_in.source,
+        currency=tx_in.currency,
+        category=tx_in.category,
+        transaction_type=tx_in.transaction_type,
+        reference_number=tx_in.reference_number,
+        is_verified=False,  # Offchain transactions may need verification
+    )
+    db.add(tx)
+    db.commit()
+    db.refresh(tx)
+    return tx
+
+@router.post("/onchain", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+def create_onchain_transaction(
+    tx_in: OnchainTransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_jwt)
+):
+    """
+    Record an onchain transaction (blockchain-based).
+    These are stored in the database for faster retrieval and historical tracking.
+    """
+    tx = Transaction(
+        user_id=current_user.id,
+        amount=tx_in.amount,
+        description=tx_in.description or f"Sent to {tx_in.recipient or 'Unknown'}",
+        source="onchain",
+        currency=tx_in.currency,
+        category=tx_in.category or "Transfer",
+        transaction_type=tx_in.transaction_type,
+        tx_hash=tx_in.tx_hash,
+        recipient=tx_in.recipient,
+        is_verified=True,  # Onchain transactions are verified by blockchain
     )
     db.add(tx)
     db.commit()
@@ -43,31 +97,44 @@ def create_transaction(
 
 @router.get("/", response_model=List[TransactionResponse])
 def list_transactions(
+    source: str = None,
+    transaction_type: str = None,
+    limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_jwt)
 ):
-    txs = db.query(Transaction).filter(Transaction.user_id == current_user.id).all()
+    """List transactions with optional filtering"""
+    query = db.query(Transaction).filter(Transaction.user_id == current_user.id)
+    
+    if source:
+        query = query.filter(Transaction.source == source)
+    
+    if transaction_type:
+        query = query.filter(Transaction.transaction_type == transaction_type)
+    
+    txs = query.order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
     return txs
 
-@router.post("/record")
-def record_onchain_tx(req: RecordTxRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
-    # Here you'd interact directly with the DB, tracking an on-chain action
-    tx = Transaction(
-        user_id=current_user.id,
-        amount=-req.amount_usdc,
-        description=req.note or f"Sent to {req.recipient or 'Unknown'}",
-        source="onchain",
-        currency="USDC",
-        tx_hash=req.tx_hash,
-        category=req.category or "Transfer"
-    )
-    db.add(tx)
-    db.commit()
-    db.refresh(tx)
-    return {"message": "Transaction recorded", "id": tx.id}
+@router.get("/{tx_id}", response_model=TransactionResponse)
+def get_transaction(
+    tx_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_jwt)
+):
+    """Get a specific transaction"""
+    tx = db.query(Transaction).filter(
+        Transaction.user_id == current_user.id,
+        Transaction.id == tx_id
+    ).first()
+    
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    return tx
 
 @router.post("/ai-categorize")
 def ai_categorize(req: AICategorizeRequest, current_user: User = Depends(get_current_user_jwt)):
-    # Mock AI response - in a real scenario you would call an LLM directly
+    """Mock AI response for categorizing transactions"""
     category = "Food" if "grocery" in req.description.lower() else "Entertainment"
     return {"category": category, "confidence": 0.9}

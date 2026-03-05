@@ -49,7 +49,31 @@ export const recordOnchainTx = (data: {
   recipient?: string
   note?: string
   category?: string
-}) => api.post("/api/v1/transactions/record", data)
+}) => api.post("/api/v1/transactions/onchain", {
+  tx_hash: data.tx_hash,
+  amount: data.amount_usdc,
+  recipient: data.recipient,
+  description: data.note,
+  category: data.category,
+  currency: "USDC",
+})
+
+export const recordOffchainTx = (data: {
+  amount: number
+  description: string
+  source: "mpesa" | "bank" | "cash"
+  category?: string
+  reference_number?: string
+  currency?: string
+}) => api.post("/api/v1/transactions/offchain", {
+  amount: data.amount,
+  description: data.description,
+  source: data.source,
+  category: data.category,
+  reference_number: data.reference_number,
+  currency: data.currency || "KES",
+  transaction_type: "expense",
+})
 
 // ── BUDGET ────────────────────────────────────────────
 export const getCurrentBudget = () =>
@@ -84,3 +108,21 @@ export const createTransaction = (data: {
 
 export const categorizeWithAI = (description: string, amount: number) =>
   api.post("/api/v1/transactions/ai-categorize", { description, amount })
+
+// ── SHOPPING ──────────────────────────────────────────
+export const getShoppingLists = () =>
+  api.get("/api/v1/shopping-lists")
+
+export const createShoppingList = (data: {
+  name: string
+  budget: number
+}) => api.post("/api/v1/shopping-lists", data)
+
+export const getShoppingList = (listId: number) =>
+  api.get(`/api/v1/shopping-lists/${listId}`)
+
+export const addShoppingItem = (listId: number, data: {
+  name: string
+  qty: number
+  price: number
+}) => api.post(`/api/v1/shopping-lists/${listId}/items`, data)
