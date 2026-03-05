@@ -17,7 +17,7 @@ export function useTransactions(params?: {
       const raw = response.data
       const list = Array.isArray(raw) ? raw : (raw?.transactions ?? [])
       return {
-        transactions: list.map((tx: { id?: number; created_at?: string; [k: string]: unknown }) => ({
+        transactions: list.map((tx: { id?: number; created_at?: string;[k: string]: unknown }) => ({
           ...tx,
           id: String(tx.id ?? Math.random()),
           date: tx.created_at ?? tx.date ?? new Date().toISOString(),
@@ -29,8 +29,9 @@ export function useTransactions(params?: {
       }
     },
     enabled: !!jwt,
-    staleTime: 0,
+    staleTime: 60000,
+    gcTime: 5 * 60000,
     refetchOnMount: true,
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   })
 }

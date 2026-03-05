@@ -10,6 +10,10 @@ function getStoredTheme(): "light" | "dark" {
 }
 
 interface AppState {
+  // Hydration state
+  _hasHydrated: boolean
+  setHasHydrated: (val: boolean) => void
+
   // Auth
   address: string | null
   jwt: string | null
@@ -37,6 +41,8 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     set => ({
+      _hasHydrated: false,
+      setHasHydrated: (val) => set({ _hasHydrated: val }),
       address: null,
       jwt: null,
       user: null,
@@ -72,6 +78,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "cointrack_store",
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
       // Only persist auth fields — not UI/balance state
       partialize: state => ({
         address: state.address,
