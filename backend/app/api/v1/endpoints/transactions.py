@@ -17,6 +17,22 @@ from app.schemas.transaction import (
 
 router = APIRouter()
 
+
+_VALID_SOURCES = {"mpesa", "bank", "cash", "onchain"}
+
+
+def _normalize_source(s: str) -> str:
+    v = (s or "cash").lower()
+    if v not in _VALID_SOURCES:
+        raise HTTPException(status_code=400, detail=f"Invalid source: {s}. Use mpesa, bank, cash, or onchain.")
+    return v
+
+
+def _normalize_transaction_type(s: str) -> str:
+    v = (s or "expense").lower()
+    return v if v in ("expense", "income") else "expense"
+
+
 class AICategorizeRequest(BaseModel):
     description: str
     amount: float
@@ -36,10 +52,10 @@ def create_offchain_transaction(
         user_id=current_user.id,
         amount=tx_in.amount,
         description=tx_in.description,
-        source=tx_in.source,
+        source=_normalize_source(tx_in.source),
         currency=tx_in.currency,
         category=tx_in.category,
-        transaction_type=tx_in.transaction_type,
+        transaction_type=_normalize_transaction_type(tx_in.transaction_type),
         reference_number=tx_in.reference_number,
         is_verified=False,  # Offchain transactions may need verification
     )
@@ -65,7 +81,7 @@ def create_onchain_transaction(
         source="onchain",
         currency=tx_in.currency,
         category=tx_in.category or "Transfer",
-        transaction_type=tx_in.transaction_type,
+        transaction_type=_normalize_transaction_type(tx_in.transaction_type),
         tx_hash=tx_in.tx_hash,
         recipient=tx_in.recipient,
         is_verified=True,  # Onchain transactions are verified by blockchain
@@ -92,10 +108,10 @@ def create_transaction(
         user_id=current_user.id,
         amount=tx_in.amount,
         description=tx_in.description,
-        source=tx_in.source,
+        source=_normalize_source(tx_in.source),
         currency=tx_in.currency,
         category=tx_in.category,
-        transaction_type=tx_in.transaction_type,
+        transaction_type=_normalize_transaction_type(tx_in.transaction_type),
     )
     db.add(tx)
     db.commit()
@@ -133,10 +149,12 @@ def list_transactions(
     query = db.query(Transaction).filter(Transaction.user_id == current_user.id)
     
     if source:
-        query = query.filter(Transaction.source == source)
-    
+        v = (source or "").lower()
+        if v in _VALID_SOURCES:
+            query = query.filter(Transaction.source == v)
     if transaction_type:
-        query = query.filter(Transaction.transaction_type == transaction_type)
+        v = _normalize_transaction_type(transaction_type)
+        query = query.filter(Transaction.transaction_type == v)
     
     txs = query.order_by(Transaction.created_at.desc()).offset(offset).limit(limit).all()
     return txs

@@ -11,7 +11,16 @@ export function useTransactions(params?: {
     queryKey: ["transactions", params],
     queryFn: async () => {
       const response = await getTransactions(params)
-      return response.data
+      const raw = response.data
+      const list = Array.isArray(raw) ? raw : (raw?.transactions ?? [])
+      return {
+        transactions: list.map((tx: { id?: number; created_at?: string; [k: string]: unknown }) => ({
+          ...tx,
+          id: String(tx.id ?? Math.random()),
+          date: tx.created_at ?? tx.date ?? new Date().toISOString(),
+          amount: tx.transaction_type === "income" ? Math.abs(Number(tx.amount)) : -Math.abs(Number(tx.amount)),
+        })),
+      }
     },
     staleTime: 30000, // 30 seconds
   })
