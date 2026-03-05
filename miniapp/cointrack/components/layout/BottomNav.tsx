@@ -1,64 +1,69 @@
 "use client"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
+const TABS = [
+  { key: "home", label: "Home", icon: "🏠", href: "/dashboard" },
+  { key: "wallet", label: "Wallet", icon: "💳", href: "/wallet" },
+  { key: "budget", label: "Budget", icon: "📊", href: "/budget" },
+  { key: "savings", label: "Savings", icon: "🎯", href: "/savings" },
+  { key: "transactions", label: "Transactions", icon: "📝", href: "/transactions" },
+]
+
 export default function BottomNav() {
-  const router = useRouter()
   const pathname = usePathname()
-  const { theme } = useAppStore()
+  const { theme, jwt } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
 
-  const tabs = [
-    { id: "home" as const, href: "/dashboard", icon: "🏠", label: "Home" },
-    { id: "shopping" as const, href: "/shopping", icon: "🛒", label: "Shopping" },
-    { id: "budget" as const, href: "/budget", icon: "📊", label: "Budget" },
-    { id: "savings" as const, href: "/savings", icon: "🎯", label: "Goals" },
-    { id: "transactions" as const, href: "/transactions", icon: "📝", label: "Transactions" },
-  ]
+  // Don't show nav on the auth/splash page or when not authenticated
+  if (!jwt || pathname === "/") return null
 
   return (
     <nav
       style={{
         position: "fixed",
         bottom: 0,
-        left: 0,
-        right: 0,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "100%",
         maxWidth: 390,
-        margin: "0 auto",
         background: colors.card,
         borderTop: `1px solid ${colors.border}`,
         display: "flex",
         justifyContent: "space-around",
-        padding: "10px 0 20px",
+        padding: "8px 0 12px",
         zIndex: 100,
       }}
     >
-      {tabs.map(tab => {
+      {TABS.map(tab => {
         const isActive = pathname === tab.href
-
         return (
-          <button
-            key={tab.id}
-            onClick={() => router.push(tab.href)}
+          <a
+            key={tab.key}
+            href={tab.href}
             style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 3,
-              padding: 0,
-              color: isActive
-                ? (theme === "light" ? colors.green : colors.accent)
-                : colors.muted,
-              transition: "color 0.2s",
+              gap: 4,
+              textDecoration: "none",
+              opacity: isActive ? 1 : 0.5,
+              transition: "opacity 0.2s",
             }}
           >
             <span style={{ fontSize: 20 }}>{tab.icon}</span>
-            <span style={{ fontSize: 9, fontWeight: 600 }}>{tab.label}</span>
-          </button>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: isActive ? 700 : 400,
+                color: isActive ? colors.accent : colors.muted,
+                fontFamily: "Syne, sans-serif",
+              }}
+            >
+              {tab.label}
+            </span>
+          </a>
         )
       })}
     </nav>

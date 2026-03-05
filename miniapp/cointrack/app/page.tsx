@@ -13,7 +13,7 @@ export default function Page() {
   const { address, isConnected, chainId } = useAccount()
   const { signMessageAsync } = useSignMessage()
   const { setMiniAppReady } = useMiniKit()
-  const { user, setAuth, theme } = useAppStore()
+  const { jwt, user, setAuth, logout, theme } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
@@ -24,42 +24,47 @@ export default function Page() {
     setMiniAppReady()
   }, [setMiniAppReady])
 
-  // Redirect if already authenticated
   useEffect(() => {
-    if (user) {
-      router.replace("/dashboard")
-    }
-  }, [user, router])
-
-  useEffect(() => {
-    if (user) return // Don't auth if already authenticated
-
-    // For development: allow demo access without wallet connection
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+
+    // Already authenticated in store — verify JWT is still valid
+    if (jwt && user) {
+      getMe()
+        .then(() => {
+          router.replace("/dashboard")
+        })
+        .catch(() => {
+          // JWT expired — clear store and re-auth
+          logout()
+          setLoading(false)
+        })
+      return
+    }
 
     if (!isConnected || !address) {
       if (isDemo) {
-        // Demo mode: set mock address for testing
         setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
-        setLoading(false)
+        router.replace("/dashboard")
       } else {
         setLoading(false)
       }
       return
     }
 
-    const existingJwt = localStorage.getItem("pocketpal_jwt")
+    // Check localStorage JWT as fallback (handles cases where persist hasn't rehydrated yet)
+    const existingJwt = typeof window !== "undefined"
+      ? localStorage.getItem("pocketpal_jwt")
+      : null
 
     if (existingJwt) {
-      // Verify existing JWT still valid
       getMe()
         .then(res => {
           setAuth(address, existingJwt, res.data)
-          setLoading(false)
+          router.replace("/dashboard")
         })
         .catch(() => {
-          // JWT expired — re-authenticate
           localStorage.removeItem("pocketpal_jwt")
+          logout()
           doAuth()
         })
     } else {
@@ -75,6 +80,7 @@ export default function Page() {
         )
         const userRes = await getMe()
         setAuth(address!, token, userRes.data)
+        router.replace("/dashboard")
       } catch (err: unknown) {
         console.error("Auth error:", err)
         const res = err && typeof err === "object" && "response" in err
@@ -92,11 +98,10 @@ export default function Page() {
                 ? err.message
                 : "Authentication failed. Please try again."
         setError(msg)
-      } finally {
         setLoading(false)
       }
     }
-  }, [isConnected, address, chainId, signMessageAsync, setAuth, retryKey, user])
+  }, [isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
 
   if (loading) return (
     <div style={{
@@ -161,7 +166,7 @@ export default function Page() {
       </p>
 
       {error && (
-        <div style={{ color: colors.red || colors.danger, fontSize: 14, marginBottom: 16 }}>
+        <div style={{ color: colors.red || "#EF4444", fontSize: 14, marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -171,7 +176,7 @@ export default function Page() {
           onClick={() => {
             setError(null)
             setLoading(true)
-            setRetryKey((k) => k + 1)
+            setRetryKey(k => k + 1)
           }}
           style={{
             padding: "16px 32px",
