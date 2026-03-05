@@ -54,7 +54,6 @@ export default function BudgetPage() {
     )
   }
 
-  const budget = data?.budget || {}
   let categories: Category[] = data?.categories || []
 
   if (Array.isArray(data) && data.length > 0) {
@@ -83,8 +82,8 @@ export default function BudgetPage() {
       <TopBar title="Budget" />
       <div style={{ paddingTop: 20, paddingBottom: 100 }}>
         <BudgetSummaryBar
-          spent={totalSpent || budget.total_spent || 50000}
-          budget={totalBudget || budget.total_budget || 68000}
+          spent={totalSpent}
+          budget={totalBudget}
           currency="KES"
         />
 
