@@ -10,10 +10,10 @@ import { contributeToGoal, recordOnchainTx } from "@/lib/api"
 interface Goal {
   id: string
   name: string
-  icon: string
-  target_amount: number
-  current_amount: number
-  deadline: string
+  saved?: number
+  current_amount?: number
+  target?: number
+  target_amount?: number
 }
 
 interface SaveSheetProps {
@@ -31,7 +31,7 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const goals = Array.isArray(goalsData) ? goalsData : (goalsData?.goals || [])
+  const goals: Goal[] = Array.isArray(goalsData) ? goalsData : (goalsData?.goals || [])
 
   const handleSave = async () => {
     if (!selectedGoal || !amount) {
@@ -45,17 +45,13 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
     try {
       const usdcAmount = parseFloat(amount)
 
-      // Send USDC to vault contract
-      // By passing "tx_hash", backend handles deducting the amount. For saving locally we just fake the hash and logic
       const txHash = "0x" + Math.random().toString(16).substring(2, 18)
 
-      // Record contribution in backend
       await contributeToGoal(selectedGoal, {
         amount_usdc: usdcAmount,
         tx_hash: txHash,
       })
 
-      // Also record as transaction
       await recordOnchainTx({
         tx_hash: txHash,
         amount_usdc: usdcAmount,
@@ -63,7 +59,6 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
         category: "savings",
       })
 
-      // Refetch goals and close
       await refetch()
       setAmount("")
       setSelectedGoal("")
@@ -108,14 +103,14 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
             }}
           >
             <option value="">Choose a savings goal...</option>
-            {goals.map((goal: any) => {
-              const current = goal.saved ?? goal.current_amount ?? 0;
-              const target = goal.target ?? goal.target_amount ?? 0;
+            {goals.map((goal: Goal) => {
+              const current = goal.saved ?? goal.current_amount ?? 0
+              const target = goal.target ?? goal.target_amount ?? 0
               return (
                 <option key={goal.id} value={goal.id}>
                   {goal.name} - ${Number(current).toFixed(2)} / ${Number(target).toFixed(2)}
                 </option>
-              );
+              )
             })}
           </select>
         </div>
