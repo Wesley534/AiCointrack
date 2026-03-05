@@ -18,17 +18,58 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add new columns to transactions table
-    op.add_column('transactions', sa.Column('transaction_type', sa.Enum('expense', 'income', name='transactiontype'), server_default='expense', nullable=False))
-    op.add_column('transactions', sa.Column('recipient', sa.String(length=255), nullable=True))
-    op.add_column('transactions', sa.Column('reference_number', sa.String(length=255), nullable=True))
-    op.add_column('transactions', sa.Column('is_verified', sa.Boolean(), server_default='false', nullable=False))
-    op.add_column('transactions', sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=False))
+    conn = op.get_bind()
     
-    # Create indices for better query performance
-    op.create_index('ix_transactions_source', 'transactions', ['source'])
-    op.create_index('ix_transactions_transaction_type', 'transactions', ['transaction_type'])
-    op.create_index('ix_transactions_user_created', 'transactions', ['user_id', 'created_at'])
+    # Check and add transaction_type only if missing
+    result = conn.execute(sa.text(
+        "SHOW COLUMNS FROM transactions LIKE 'transaction_type'"
+    ))
+    if not result.fetchone():
+        op.add_column('transactions', sa.Column('transaction_type', sa.Enum('expense', 'income', name='transactiontype'), server_default='expense', nullable=False))
+    
+    # Check and add recipient only if missing
+    result = conn.execute(sa.text(
+        "SHOW COLUMNS FROM transactions LIKE 'recipient'"
+    ))
+    if not result.fetchone():
+        op.add_column('transactions', sa.Column('recipient', sa.String(length=255), nullable=True))
+    
+    # Check and add reference_number only if missing
+    result = conn.execute(sa.text(
+        "SHOW COLUMNS FROM transactions LIKE 'reference_number'"
+    ))
+    if not result.fetchone():
+        op.add_column('transactions', sa.Column('reference_number', sa.String(length=255), nullable=True))
+    
+    # Check and add is_verified only if missing
+    result = conn.execute(sa.text(
+        "SHOW COLUMNS FROM transactions LIKE 'is_verified'"
+    ))
+    if not result.fetchone():
+        op.add_column('transactions', sa.Column('is_verified', sa.Boolean(), server_default='0', nullable=False))
+    
+    # Check and add updated_at only if missing
+    result = conn.execute(sa.text(
+        "SHOW COLUMNS FROM transactions LIKE 'updated_at'"
+    ))
+    if not result.fetchone():
+        op.add_column('transactions', sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=False))
+    
+    # Create indices for better query performance (idempotent - won't fail if they exist)
+    try:
+        op.create_index('ix_transactions_source', 'transactions', ['source'])
+    except:
+        pass
+    
+    try:
+        op.create_index('ix_transactions_transaction_type', 'transactions', ['transaction_type'])
+    except:
+        pass
+    
+    try:
+        op.create_index('ix_transactions_user_created', 'transactions', ['user_id', 'created_at'])
+    except:
+        pass
 
 
 def downgrade() -> None:

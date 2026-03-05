@@ -49,6 +49,7 @@ export const recordOnchainTx = (data: {
   recipient?: string
   note?: string
   category?: string
+  transaction_type?: "expense" | "income"
 }) => api.post("/api/v1/transactions/onchain", {
   tx_hash: data.tx_hash,
   amount: data.amount_usdc,
@@ -56,6 +57,7 @@ export const recordOnchainTx = (data: {
   description: data.note,
   category: data.category,
   currency: "USDC",
+  transaction_type: data.transaction_type ?? "expense",
 })
 
 export const recordOffchainTx = (data: {
@@ -65,6 +67,7 @@ export const recordOffchainTx = (data: {
   category?: string
   reference_number?: string
   currency?: string
+  transaction_type?: "expense" | "income"
 }) => api.post("/api/v1/transactions/offchain", {
   amount: data.amount,
   description: data.description,
@@ -72,7 +75,7 @@ export const recordOffchainTx = (data: {
   category: data.category,
   reference_number: data.reference_number,
   currency: data.currency || "KES",
-  transaction_type: "expense",
+  transaction_type: data.transaction_type ?? "expense",
 })
 
 // ── BUDGET ────────────────────────────────────────────

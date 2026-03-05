@@ -19,11 +19,14 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
-# Configure CORS for Flutter app
+# Configure CORS (miniapp, Flutter, local dev)
+# Note: allow_credentials=True + allow_origins=["*"] is invalid per CORS spec and can
+# cause "Network Error" in browsers. We use Bearer tokens, not cookies, so credentials
+# are not required.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
