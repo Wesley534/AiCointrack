@@ -9,7 +9,7 @@ from app.core.deps import get_current_user_jwt
 
 router = APIRouter()
 
-@router.post("/", response_model=ShoppingListResponse)
+@router.post("", response_model=ShoppingListResponse)
 def create_shopping_list(list_in: ShoppingListCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
     s_list = ShoppingList(**list_in.dict(), user_id=current_user.id)
     db.add(s_list)
@@ -17,7 +17,7 @@ def create_shopping_list(list_in: ShoppingListCreate, db: Session = Depends(get_
     db.refresh(s_list)
     return s_list
 
-@router.get("/", response_model=List[ShoppingListResponse])
+@router.get("", response_model=List[ShoppingListResponse])
 def get_shopping_lists(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
     return db.query(ShoppingList).filter(ShoppingList.user_id == current_user.id).all()
 

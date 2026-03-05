@@ -8,6 +8,7 @@ export function useBudget() {
       const response = await getCurrentBudget()
       return response.data
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 0,
+    refetchInterval: 15000,
   })
 }

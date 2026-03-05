@@ -8,7 +8,8 @@ export function useGoals() {
       const response = await getGoals()
       return response.data
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 0,
+    refetchInterval: 15000,
   })
 
   return {

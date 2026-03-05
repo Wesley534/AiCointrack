@@ -14,7 +14,7 @@ class ContributeRequest(BaseModel):
     amount_usdc: float
     tx_hash: str
 
-@router.post("/", response_model=SavingsGoalResponse)
+@router.post("", response_model=SavingsGoalResponse)
 def create_goal(goal_in: SavingsGoalCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
     goal = SavingsGoal(**goal_in.dict(), user_id=current_user.id)
     db.add(goal)
@@ -22,7 +22,7 @@ def create_goal(goal_in: SavingsGoalCreate, db: Session = Depends(get_db), curre
     db.refresh(goal)
     return goal
 
-@router.get("/", response_model=List[SavingsGoalResponse])
+@router.get("", response_model=List[SavingsGoalResponse])
 def get_goals(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_jwt)):
     return db.query(SavingsGoal).filter(SavingsGoal.user_id == current_user.id).all()
 
