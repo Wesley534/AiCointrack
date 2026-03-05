@@ -31,7 +31,7 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const goals = goalsData?.goals || []
+  const goals = Array.isArray(goalsData) ? goalsData : (goalsData?.goals || [])
 
   const handleSave = async () => {
     if (!selectedGoal || !amount) {

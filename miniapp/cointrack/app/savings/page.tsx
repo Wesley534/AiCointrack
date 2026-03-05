@@ -38,7 +38,7 @@ export default function SavingsPage() {
     )
   }
 
-  const goals = data?.goals || []
+  const goals = Array.isArray(data) ? data : (data?.goals || [])
 
   // Normalize goal data structure from backend
   const displayGoals = goals.map((goal: { id: string; name: string; icon?: string; target?: number; target_amount?: number; saved?: number; current_amount?: number; deadline?: string }) => ({
@@ -48,7 +48,7 @@ export default function SavingsPage() {
     target: goal.target || goal.target_amount || 0,
     saved: goal.saved || goal.current_amount || 0,
   }))
-  
+
   const totalSaved = displayGoals.reduce((sum: number, goal: Goal) => sum + (goal.saved || 0), 0)
 
   return (
