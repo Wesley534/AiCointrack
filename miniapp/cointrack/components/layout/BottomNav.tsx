@@ -11,10 +11,10 @@ export default function BottomNav() {
 
   const tabs = [
     { id: "home" as const, href: "/", icon: "🏠", label: "Home" },
-    { id: "wallet" as const, href: "/wallet", icon: "💰", label: "Wallet" },
+    { id: "shopping" as const, href: "/shopping", icon: "🛒", label: "Shopping" },
     { id: "budget" as const, href: "/budget", icon: "📊", label: "Budget" },
     { id: "savings" as const, href: "/savings", icon: "🎯", label: "Goals" },
-    { id: "transactions" as const, href: "/transactions", icon: "📝", label: "History" },
+    { id: "transactions" as const, href: "/transactions", icon: "📝", label: "Transactions" },
   ]
 
   return (

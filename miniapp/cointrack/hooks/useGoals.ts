@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { getGoals } from "@/lib/api"
 
 export function useGoals() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ["goals"],
     queryFn: async () => {
       const response = await getGoals()
@@ -10,4 +10,11 @@ export function useGoals() {
     },
     staleTime: 60000, // 1 minute
   })
+
+  return {
+    data: query.data,
+    isLoading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  }
 }
