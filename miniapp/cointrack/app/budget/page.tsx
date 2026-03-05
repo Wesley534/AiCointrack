@@ -12,13 +12,25 @@ import { lightTheme, darkTheme } from "@/lib/constants"
 interface Category {
   id: number
   name: string
-  label?: string
+  label: string
   icon: string
   spent: number
   actual?: number
   budget: number
   planned?: number
   type: "need" | "want" | "save"
+  kind?: string
+  tag?: string
+  month?: string
+}
+
+interface BudgetItem {
+  id?: number
+  label?: string
+  name?: string
+  icon?: string
+  actual?: number
+  planned?: number
   kind?: string
   tag?: string
   month?: string
@@ -43,14 +55,13 @@ export default function BudgetPage() {
   }
 
   const budget = data?.budget || {}
-  let categories = data?.categories || []
+  let categories: Category[] = data?.categories || []
 
-  // Normalize budget data structure from backend if needed
   if (Array.isArray(data) && data.length > 0) {
-    categories = data.map((item: any) => ({
-      id: item.id,
-      name: item.label || item.name,
-      label: item.label,
+    categories = (data as BudgetItem[]).map((item) => ({
+      id: item.id || 0,
+      name: item.label || item.name || "",
+      label: item.label || "",
       icon: item.icon || "📊",
       spent: item.actual || 0,
       actual: item.actual || 0,
@@ -64,8 +75,8 @@ export default function BudgetPage() {
   }
 
   const displayCategories = categories.length > 0 ? categories : []
-  const totalSpent = displayCategories.reduce((sum: number, cat: Category) => sum + (cat.spent || 0), 0)
-  const totalBudget = displayCategories.reduce((sum: number, cat: Category) => sum + (cat.budget || 0), 0)
+  const totalSpent = displayCategories.reduce((sum, cat) => sum + (cat.spent || 0), 0)
+  const totalBudget = displayCategories.reduce((sum, cat) => sum + (cat.budget || 0), 0)
 
   return (
     <div>
@@ -125,7 +136,7 @@ export default function BudgetPage() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {displayCategories.map((cat: Category, idx: number) => (
+              {displayCategories.map((cat, idx) => (
                 <div
                   key={idx}
                   onClick={() => setSelectedBudget(cat)}

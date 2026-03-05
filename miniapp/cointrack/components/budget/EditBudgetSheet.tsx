@@ -10,12 +10,12 @@ interface EditBudgetSheetProps {
   onClose: () => void
   budget: {
     id: number
-    label: string
-    planned: number
+    label?: string
+    planned?: number
     actual?: number
-    tag: string
-    kind: string
-    month: string
+    tag?: string
+    kind?: string
+    month?: string
   } | null
   onSuccess: () => void
 }
@@ -27,7 +27,7 @@ export default function EditBudgetSheet({ isOpen, onClose, budget, onSuccess }: 
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
   const [label, setLabel] = useState(budget?.label || "")
-  const [planned, setPlanned] = useState(budget?.planned.toString() || "")
+  const [planned, setPlanned] = useState(budget?.planned?.toString() || "")
   const [tag, setTag] = useState(budget?.tag || BUDGET_TAGS[0])
   const [kind, setKind] = useState(budget?.kind || BUDGET_KINDS[0])
   const [month, setMonth] = useState(budget?.month || new Date().toISOString().slice(0, 7))
