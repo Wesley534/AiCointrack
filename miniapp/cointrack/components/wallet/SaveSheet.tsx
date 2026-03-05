@@ -108,11 +108,15 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
             }}
           >
             <option value="">Choose a savings goal...</option>
-            {goals.map((goal: Goal) => (
-              <option key={goal.id} value={goal.id}>
-                {goal.name} - ${goal.current_amount.toFixed(2)} / ${goal.target_amount.toFixed(2)}
-              </option>
-            ))}
+            {goals.map((goal: any) => {
+              const current = goal.saved ?? goal.current_amount ?? 0;
+              const target = goal.target ?? goal.target_amount ?? 0;
+              return (
+                <option key={goal.id} value={goal.id}>
+                  {goal.name} - ${Number(current).toFixed(2)} / ${Number(target).toFixed(2)}
+                </option>
+              );
+            })}
           </select>
         </div>
 
