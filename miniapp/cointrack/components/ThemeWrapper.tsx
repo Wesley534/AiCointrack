@@ -12,7 +12,16 @@ export default function ThemeWrapper({ children }: { children: ReactNode }) {
     setMounted(true);
   }, []);
 
-  // Before hydration, render dark theme to prevent flashing
+  // Initialize Eruda debug console for non-localhost environments
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      !window.location.hostname.includes("localhost")
+    ) {
+      import("eruda").then((eruda) => eruda.default.init());
+    }
+  }, []);
+
   const resolvedTheme = mounted ? theme : "dark";
   const colors = resolvedTheme === "light" ? lightTheme : darkTheme;
   const bg = resolvedTheme === "light" ? colors.bg : (colors.surface ?? colors.bg);

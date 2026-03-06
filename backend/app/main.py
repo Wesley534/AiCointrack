@@ -20,15 +20,19 @@ app = FastAPI(
 )
 
 # Configure CORS (miniapp, Flutter, local dev)
-# Note: allow_credentials=True + allow_origins=["*"] is invalid per CORS spec and can
-# cause "Network Error" in browsers. We use Bearer tokens, not cookies, so credentials
-# are not required.
+# Explicitly list origins to avoid DevTunnel CORS issues
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://cointrack-nu.vercel.app",
+        "*",  # Fallback for other origins
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Initialize Firebase Admin SDK on startup

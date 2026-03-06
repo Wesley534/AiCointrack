@@ -6,53 +6,43 @@ import { useMiniKit } from "@coinbase/onchainkit/minikit"
 import { authenticateWallet } from "@/lib/auth"
 import { getMe } from "@/lib/api"
 import { useAppStore } from "@/store"
-import { lightTheme, darkTheme } from "@/lib/constants"
+import { darkTheme } from "@/lib/constants"
 
 export default function Page() {
   const router = useRouter()
   const { address, isConnected, chainId } = useAccount()
   const { signMessageAsync } = useSignMessage()
   const { setMiniAppReady } = useMiniKit()
-  const { jwt, user, setAuth, logout, theme, _hasHydrated } = useAppStore()
+  const { jwt, user, setAuth, logout, _hasHydrated } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [retryKey, _setRetryKey] = useState(0)
-  const colors = theme === "light" ? lightTheme : darkTheme
+  const colors = darkTheme
 
   useEffect(() => {
     setMiniAppReady()
   }, [setMiniAppReady])
 
   useEffect(() => {
-    // ← CRITICAL: Do not run auth logic until Zustand has rehydrated from localStorage.
-    // Without this, jwt is null on first render and queries fire disabled,
-    // leaving shopping/goals/transactions permanently broken.
     if (!_hasHydrated) return
 
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
 
+    if (isDemo) {
+      setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
+      router.replace("/dashboard")
+      return
+    }
+
+    // Already have JWT + user — go straight to dashboard.
+    // Do NOT call getMe() here — a transient network failure would
+    // call logout() and wipe the session, breaking all subsequent queries.
     if (jwt && user) {
-      getMe()
-        .then(() => {
-          router.replace("/dashboard")
-        })
-        .catch(() => {
-          logout()
-          setLoading(false)
-        })
+      router.replace("/dashboard")
       return
     }
 
-    if (!isConnected || !address) {
-      if (isDemo) {
-        setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
-        router.replace("/dashboard")
-      } else {
-        setLoading(false)
-      }
-      return
-    }
-
+    // JWT exists in localStorage but not in store (e.g. store was reset
+    // but localStorage wasn't). Verify it and restore the session.
     const existingJwt = typeof window !== "undefined"
       ? localStorage.getItem("pocketpal_jwt")
       : null
@@ -60,30 +50,43 @@ export default function Page() {
     if (existingJwt) {
       getMe()
         .then(res => {
-          setAuth(address, existingJwt, res.data)
+          setAuth(address || "", existingJwt, res.data)
           router.replace("/dashboard")
         })
         .catch(() => {
+          // JWT genuinely expired — clear it and re-auth
           localStorage.removeItem("pocketpal_jwt")
-          logout()
-          doAuth()
+          if (isConnected && address) {
+            doAuth()
+          } else {
+            setLoading(false)
+          }
         })
-    } else {
-      doAuth()
+      return
     }
+
+    if (!isConnected || !address) {
+      setLoading(false)
+      return
+    }
+
+    doAuth()
 
     async function doAuth() {
       try {
+        console.log("[Auth] Starting SIWE auth for", address)
         const token = await authenticateWallet(
           address!,
           chainId || 8453,
           signMessageAsync
         )
+        console.log("[Auth] Got JWT, fetching user profile")
         const userRes = await getMe()
         setAuth(address!, token, userRes.data)
+        console.log("[Auth] Complete, redirecting to dashboard")
         router.replace("/dashboard")
       } catch (err: unknown) {
-        console.error("Auth error:", err)
+        console.error("[Auth] Error:", err)
         const res = err && typeof err === "object" && "response" in err
           ? (err as { response?: { data?: unknown; status?: number } }).response
           : null
@@ -102,9 +105,8 @@ export default function Page() {
         setLoading(false)
       }
     }
-  }, [_hasHydrated, isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
+  }, [_hasHydrated, isConnected, address, chainId, signMessageAsync, setAuth, logout, jwt, user, router])
 
-  // Show loading spinner while store is hydrating or auth is in progress
   if (!_hasHydrated || loading) return (
     <div style={{
       display: "flex",
@@ -113,17 +115,17 @@ export default function Page() {
       height: "100vh",
       flexDirection: "column",
       gap: 16,
-      background: colors.surface ?? colors.bg,
+      background: colors.surface,
     }}>
       <div style={{
         width: 48,
         height: 48,
         borderRadius: 14,
-        background: `linear-gradient(135deg, ${colors.accent ?? colors.green}, ${colors.accentDim ?? "#0047B3"})`,
+        background: `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 24
+        fontSize: 24,
       }}>
         💰
       </div>
@@ -131,15 +133,17 @@ export default function Page() {
     </div>
   )
 
-  if (!isConnected && process.env.NEXT_PUBLIC_DEMO_MODE !== "true") return (
+  if (!isConnected) return (
     <div style={{
       padding: 32,
       textAlign: "center",
-      background: colors.surface ?? colors.bg,
+      background: colors.surface,
       minHeight: "100vh",
     }}>
       <div style={{ fontSize: 48, marginBottom: 16 }}>💰</div>
-      <div style={{ fontWeight: 800, fontSize: 24, marginBottom: 8, color: colors.text }}>Cointrack</div>
+      <div style={{ fontWeight: 800, fontSize: 24, marginBottom: 8, color: colors.text }}>
+        Cointrack
+      </div>
       <div style={{ color: colors.muted, fontSize: 15 }}>
         Open this app inside the Base app to connect your wallet automatically.
       </div>
@@ -148,24 +152,44 @@ export default function Page() {
 
   return (
     <div style={{
-      background: colors.surface ?? colors.bg,
+      background: colors.surface,
       minHeight: "100vh",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
       padding: 32,
-      textAlign: "center"
+      textAlign: "center",
     }}>
       <div style={{ fontSize: 64, marginBottom: 24 }}>💰</div>
-      <h1 style={{ color: colors.text, fontSize: 28, fontFamily: "Syne, sans-serif", marginBottom: 16 }}>
+      <h1 style={{
+        color: colors.text,
+        fontSize: 28,
+        fontFamily: "Syne, sans-serif",
+        marginBottom: 16,
+      }}>
         Welcome to Cointrack
       </h1>
-      <p style={{ color: colors.muted, fontSize: 16, lineHeight: 1.6, marginBottom: 32, maxWidth: 300 }}>
-        The all-in-one wallet and financial tracker. Manage your budget, reach your savings goals, and track everyday transactions effortlessly on Base.
+      <p style={{
+        color: colors.muted,
+        fontSize: 16,
+        lineHeight: 1.6,
+        marginBottom: 32,
+        maxWidth: 300,
+      }}>
+        Connecting your wallet...
       </p>
       {error && (
-        <div style={{ color: "#EF4444", fontSize: 14, marginBottom: 16 }}>
+        <div style={{
+          color: "#EF4444",
+          fontSize: 14,
+          marginBottom: 16,
+          background: "rgba(220,38,38,0.1)",
+          padding: "12px 16px",
+          borderRadius: 8,
+          border: "1px solid rgba(220,38,38,0.3)",
+          maxWidth: 300,
+        }}>
           {error}
         </div>
       )}
