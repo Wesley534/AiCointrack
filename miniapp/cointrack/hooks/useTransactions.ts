@@ -10,7 +10,6 @@ export function useTransactions(params?: {
 }) {
   const jwt = useAppStore(state => state.jwt)
 
-  // Stable key — serialize params so object identity doesn't bust the cache
   const queryKey = ["transactions", params?.limit, params?.offset, params?.source, params?.month]
 
   return useQuery({
@@ -36,15 +35,5 @@ export function useTransactions(params?: {
     refetchOnMount: true,
     refetchInterval: 60_000,
     gcTime: 5 * 60_000,
-  })
-}
-        })),
-      }
-    },
-    enabled: !!jwt,
-    staleTime: 60000,
-    gcTime: 5 * 60000,
-    refetchOnMount: true,
-    refetchInterval: 60000,
   })
 }
