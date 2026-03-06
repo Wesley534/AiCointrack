@@ -16,7 +16,7 @@ export default function Page() {
   const { jwt, user, setAuth, logout, theme, _hasHydrated } = useAppStore()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [retryKey, setRetryKey] = useState(0)
+  const [retryKey, _setRetryKey] = useState(0)
   const colors = theme === "light" ? lightTheme : darkTheme
 
   useEffect(() => {
