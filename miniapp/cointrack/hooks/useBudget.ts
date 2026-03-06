@@ -12,15 +12,15 @@ export function useBudget() {
       return response.data
     },
     enabled: !!jwt,
-    staleTime: 60000,
-    gcTime: 5 * 60000,
+    staleTime: 30_000,
     refetchOnMount: true,
-    refetchInterval: 60000,
+    refetchInterval: 60_000,
+    gcTime: 5 * 60_000,
   })
 
   return {
     data: query.data,
-    isLoading: query.isPending && query.fetchStatus === "fetching",
+    isLoading: query.isLoading,
     isFetching: query.isFetching,
     error: query.error,
     refetch: query.refetch,

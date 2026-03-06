@@ -12,7 +12,7 @@ export function useShoppingLists() {
       return { lists: response.data || [] }
     },
     enabled: !!jwt,
-    staleTime: 60_000,
+    staleTime: 30_000,
     refetchOnMount: true,
     refetchInterval: 60_000,
     gcTime: 5 * 60_000,
@@ -20,7 +20,7 @@ export function useShoppingLists() {
 
   return {
     data: query.data,
-    isLoading: query.isPending && query.fetchStatus === "fetching",
+    isLoading: query.isLoading,
     error: query.error ? (query.error as { message?: string }).message || "Failed to fetch shopping lists" : null,
     refetch: query.refetch,
   }
