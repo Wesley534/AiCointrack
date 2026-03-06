@@ -25,7 +25,7 @@ export function RootProvider({ children }: { children: ReactNode }) {
         retry: false,
         // Always refetch when window regains focus or component mounts
         refetchOnMount: true,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
       }
     }
   }));
