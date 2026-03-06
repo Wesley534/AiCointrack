@@ -21,11 +21,23 @@ interface Goal {
 }
 
 export default function SavingsPage() {
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
   const { data, isLoading, refetch } = useGoals()
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
   const [showCreateGoal, setShowCreateGoal] = useState(false)
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null)
+
+  if (!_hasHydrated) {
+    return (
+      <div>
+        <TopBar title="Savings Goals" />
+        <div style={{ padding: 20, textAlign: "center", color: colors.muted }}>
+          Loading...
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

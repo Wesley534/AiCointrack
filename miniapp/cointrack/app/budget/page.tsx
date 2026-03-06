@@ -37,11 +37,23 @@ interface BudgetItem {
 }
 
 export default function BudgetPage() {
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
   const { data, isLoading, refetch } = useBudget()
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
   const [showCreateSheet, setShowCreateSheet] = useState(false)
   const [selectedBudget, setSelectedBudget] = useState<Category | null>(null)
+
+  if (!_hasHydrated) {
+    return (
+      <div>
+        <TopBar title="Budget" />
+        <div style={{ padding: 20, textAlign: "center", color: colors.muted }}>
+          Loading...
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

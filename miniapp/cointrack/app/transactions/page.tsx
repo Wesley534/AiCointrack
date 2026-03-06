@@ -8,10 +8,22 @@ import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
 export default function TransactionsPage() {
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
   const [showAddSheet, setShowAddSheet] = useState(false)
   const { data, isLoading, refetch } = useTransactions({ limit: 50 })
+
+  if (!_hasHydrated) {
+    return (
+      <div>
+        <TopBar title="Transactions" />
+        <div style={{ padding: 20, textAlign: "center", color: colors.muted }}>
+          Loading...
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
