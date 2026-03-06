@@ -8,10 +8,22 @@ import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
 export default function ShoppingPage() {
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
   const [showCreateSheet, setShowCreateSheet] = useState(false)
   const { data, isLoading, refetch } = useShoppingLists()
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
+
+  if (!_hasHydrated) {
+    return (
+      <div>
+        <TopBar title="Shopping Lists" />
+        <div style={{ padding: 20, textAlign: "center", color: colors.muted }}>
+          Loading...
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

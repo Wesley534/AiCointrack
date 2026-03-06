@@ -73,7 +73,6 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
       },
-      // Persist auth and theme fields
       partialize: state => ({
         address: state.address,
         jwt: state.jwt,
@@ -83,3 +82,12 @@ export const useAppStore = create<AppState>()(
     }
   )
 )
+
+// ─── Hydration hook ───────────────────────────────────────────────────────────
+// This is the critical piece. Instead of relying on onRehydrateStorage firing
+// before components mount, we expose a hook that components can use to wait
+// for hydration. This triggers a re-render when _hasHydrated flips to true,
+// which causes React Query's enabled condition to be re-evaluated.
+export function useHasHydrated() {
+  return useAppStore(state => state._hasHydrated)
+}
