@@ -34,7 +34,11 @@ export async function authenticateWallet(
   }
 
   if (typeof window !== "undefined") {
-    localStorage.setItem("pocketpal_jwt", jwt)
+    try {
+      localStorage.setItem("pocketpal_jwt", jwt)
+    } catch (e) {
+      console.warn("localStorage setItem denied:", e)
+    }
   }
   return jwt
 }

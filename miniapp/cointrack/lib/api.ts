@@ -1,12 +1,34 @@
 import axios from "axios"
 import { API_BASE_URL } from "./constants"
+import { useAppStore } from "@/store"
 
 const api = axios.create({ baseURL: API_BASE_URL })
 
 // Attach JWT to every request
 api.interceptors.request.use(config => {
-  const token = localStorage.getItem("pocketpal_jwt")
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  let token = null
+  if (typeof window !== "undefined") {
+    try {
+      token = useAppStore.getState().jwt
+    } catch (e) {
+      console.warn("Zustand token read failed", e)
+    }
+  }
+
+  if (!token && typeof window !== "undefined") {
+    try {
+      token = localStorage.getItem("pocketpal_jwt")
+    } catch (e) {
+      console.warn("localStorage token read failed", e)
+    }
+  }
+
+  // Allow token override in headers if explicitly provided (e.g., during login flow)
+  if (config.headers.Authorization && String(config.headers.Authorization).startsWith("Bearer ")) {
+    // Keep the one explicitly passed in getMe(token)
+  } else if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
@@ -29,8 +51,10 @@ export const emailLogin = (email: string, password: string) => {
   })
 }
 
-export const getMe = () =>
-  api.get("/api/v1/auth/me")
+export const getMe = (tokenOverride?: string) =>
+  api.get("/api/v1/auth/me", {
+    headers: tokenOverride ? { Authorization: `Bearer ${tokenOverride}` } : {},
+  })
 
 // ── HOME ──────────────────────────────────────────────
 export const getHomeData = () =>

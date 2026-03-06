@@ -43,19 +43,27 @@ export default function Page() {
 
     // JWT exists in localStorage but not in store (e.g. store was reset
     // but localStorage wasn't). Verify it and restore the session.
-    const existingJwt = typeof window !== "undefined"
-      ? localStorage.getItem("pocketpal_jwt")
-      : null
+    let existingJwt: string | null = null
+    if (typeof window !== "undefined") {
+      try {
+        existingJwt = localStorage.getItem("pocketpal_jwt")
+      } catch (e) {
+        console.warn("localStorage block:", e)
+      }
+    }
 
     if (existingJwt) {
-      getMe()
+      getMe(existingJwt)
         .then(res => {
           setAuth(address || "", existingJwt, res.data)
           router.replace("/dashboard")
         })
         .catch(() => {
           // JWT genuinely expired — clear it and re-auth
-          localStorage.removeItem("pocketpal_jwt")
+          try {
+            localStorage.removeItem("pocketpal_jwt")
+          } catch { }
+
           if (isConnected && address) {
             doAuth()
           } else {
@@ -81,7 +89,7 @@ export default function Page() {
           signMessageAsync
         )
         console.log("[Auth] Got JWT, fetching user profile")
-        const userRes = await getMe()
+        const userRes = await getMe(token)
         setAuth(address!, token, userRes.data)
         console.log("[Auth] Complete, redirecting to dashboard")
         router.replace("/dashboard")

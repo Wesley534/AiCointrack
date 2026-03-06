@@ -40,13 +40,19 @@ export const useAppStore = create<AppState>()(
       user: null,
       setAuth: (address, jwt, user) => {
         if (typeof window !== "undefined") {
-          localStorage.setItem("pocketpal_jwt", jwt)
+          try {
+            localStorage.setItem("pocketpal_jwt", jwt)
+          } catch (e) {
+            console.warn("localStorage setItem denied:", e)
+          }
         }
         set({ address, jwt, user })
       },
       logout: () => {
         if (typeof window !== "undefined") {
-          localStorage.removeItem("pocketpal_jwt")
+          try {
+            localStorage.removeItem("pocketpal_jwt")
+          } catch (e) { }
         }
         set({ address: null, jwt: null, user: null })
       },
@@ -64,7 +70,11 @@ export const useAppStore = create<AppState>()(
 
       theme: "dark",
       setTheme: theme => {
-        if (typeof window !== "undefined") localStorage.setItem("cointrack_theme", theme)
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("cointrack_theme", theme)
+          } catch (e) { }
+        }
         set({ theme })
       },
     }),
