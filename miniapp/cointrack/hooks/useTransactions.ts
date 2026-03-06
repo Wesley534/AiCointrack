@@ -10,7 +10,6 @@ export function useTransactions(params?: {
 }) {
   const jwt = useAppStore(state => state.jwt)
 
-  // Stable key — serialize params so object identity doesn't bust the cache
   const queryKey = ["transactions", params?.limit, params?.offset, params?.source, params?.month]
 
   return useQuery({
@@ -20,21 +19,21 @@ export function useTransactions(params?: {
       const raw = response.data
       const list = Array.isArray(raw) ? raw : (raw?.transactions ?? [])
       return {
-        transactions: list.map((tx: { id?: number; created_at?: string;[k: string]: unknown }) => ({
+        transactions: list.map((tx: { id?: number; created_at?: string; [k: string]: unknown }) => ({
           ...tx,
           id: String(tx.id ?? Math.random()),
-          date: tx.created_at ?? tx.date ?? new Date().toISOString(),
+          date: tx.created_at ?? (tx as any).date ?? new Date().toISOString(),
           amount:
-            tx.transaction_type === "income"
-              ? Math.abs(Number(tx.amount))
-              : -Math.abs(Number(tx.amount)),
+            (tx as any).transaction_type === "income"
+              ? Math.abs(Number((tx as any).amount))
+              : -Math.abs(Number((tx as any).amount)),
         })),
       }
     },
     enabled: !!jwt,
-    staleTime: 60000,
-    gcTime: 5 * 60000,
+    staleTime: 60_000,
     refetchOnMount: true,
-    refetchInterval: 60000,
+    refetchInterval: 60_000,
+    gcTime: 5 * 60_000,
   })
 }

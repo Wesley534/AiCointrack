@@ -1,14 +1,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
-const STORAGE_KEY = "cointrack_theme"
-
-function getStoredTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "dark"
-  const s = localStorage.getItem(STORAGE_KEY)
-  return s === "light" || s === "dark" ? s : "dark"
-}
-
 interface AppState {
   // Hydration state
   _hasHydrated: boolean
@@ -70,9 +62,9 @@ export const useAppStore = create<AppState>()(
       activeSheet: null,
       setActiveSheet: sheet => set({ activeSheet: sheet }),
 
-      theme: getStoredTheme(),
+      theme: "dark",
       setTheme: theme => {
-        if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, theme)
+        if (typeof window !== "undefined") localStorage.setItem("cointrack_theme", theme)
         set({ theme })
       },
     }),
@@ -81,11 +73,12 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
       },
-      // Only persist auth fields — not UI/balance state
+      // Persist auth and theme fields
       partialize: state => ({
         address: state.address,
         jwt: state.jwt,
         user: state.user,
+        theme: state.theme,
       }),
     }
   )
