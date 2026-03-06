@@ -12,7 +12,7 @@ export function useGoals() {
       return response.data
     },
     enabled: !!jwt,
-    staleTime: 60_000,
+    staleTime: 30_000,
     refetchOnMount: true,
     refetchInterval: 60_000,
     gcTime: 5 * 60_000,
@@ -20,7 +20,7 @@ export function useGoals() {
 
   return {
     data: query.data,
-    isLoading: query.isPending && query.fetchStatus === "fetching",
+    isLoading: query.isLoading,
     error: query.error,
     refetch: query.refetch,
   }

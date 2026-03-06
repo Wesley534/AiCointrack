@@ -31,7 +31,7 @@ export function useTransactions(params?: {
       }
     },
     enabled: !!jwt,
-    staleTime: 60_000,
+    staleTime: 30_000,
     refetchOnMount: true,
     refetchInterval: 60_000,
     gcTime: 5 * 60_000,
