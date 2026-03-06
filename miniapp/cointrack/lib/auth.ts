@@ -25,9 +25,41 @@ export async function authenticateWallet(
   })
 
   const messageString = message.prepareMessage()
-  const signature = await signMessageAsync({ message: messageString })
+  let signature: string = ""
+  let finalMessage: string = messageString
 
-  const response = await walletLogin(address, signature, messageString)
+  try {
+    // Attempt Wagmi EOA standard signing first
+    signature = await signMessageAsync({ message: messageString })
+  } catch (err: unknown) {
+    // Base App WebView / Farcaster SDK sometimes returns raw internal objects 
+    // or rejects raw personal_sign for auth, requiring `sdk.actions.signIn`
+    console.warn("Wagmi signMessageAsync failed, fallback to miniapp-sdk signIn:", err)
+
+    // Lazy load to avoid SSR issues
+    const sdk = (await import("@farcaster/miniapp-sdk")).default
+    const result = await sdk.actions.signIn({ nonce })
+
+    if (result && "signature" in result) {
+      signature = result.signature
+      finalMessage = result.message
+    } else {
+      throw new Error(`Auth Error: Native signIn failed or returned invalid object. Detail: ${JSON.stringify(result || err)}`)
+    }
+  }
+
+  // Handle cases where the bridge returns an unparsed raw object directly to the signature variable
+  if (typeof signature === "object" && signature !== null) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ("signature" in signature) signature = (signature as any).signature
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    else if ("raw" in signature) signature = (signature as any).raw
+    else {
+      throw new Error(`Auth Error: Unexpected return signature object format: ${JSON.stringify(signature)}`)
+    }
+  }
+
+  const response = await walletLogin(address, signature, finalMessage)
   const jwt = response.data?.jwt ?? response.data?.accessToken
   if (!jwt) {
     throw new Error(response.data?.detail ?? "No token in response")

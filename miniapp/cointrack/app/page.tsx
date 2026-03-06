@@ -108,7 +108,7 @@ export default function Page() {
               ? detail.map(String).join(", ")
               : err instanceof Error
                 ? err.message
-                : "Authentication failed. Please try again."
+                : `Auth Error: ${typeof err === "object" ? JSON.stringify(err) : String(err)}`
         setError(msg)
         setLoading(false)
       }

@@ -2,6 +2,8 @@
 import { ReactNode, useState } from "react";
 import { base } from "wagmi/chains";
 import { WagmiProvider, createConfig, http } from "wagmi";
+import { injected } from "wagmi/connectors";
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import BottomNav from "@/components/layout/BottomNav";
@@ -10,6 +12,7 @@ import "@coinbase/onchainkit/styles.css";
 
 const wagmiConfig = createConfig({
   chains: [base],
+  connectors: [farcasterMiniApp(), injected()],
   transports: { [base.id]: http() }
 });
 
