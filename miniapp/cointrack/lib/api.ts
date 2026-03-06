@@ -20,6 +20,15 @@ export const getNonce = async (): Promise<string> => {
 export const walletLogin = (address: string, signature: string, message: string) =>
   api.post("/api/v1/auth/wallet", { address, signature, message })
 
+export const emailLogin = (email: string, password: string) => {
+  const formData = new FormData()
+  formData.append("username", email)
+  formData.append("password", password)
+  return api.post("/api/v1/auth/login", formData, {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  })
+}
+
 export const getMe = () =>
   api.get("/api/v1/auth/me")
 
