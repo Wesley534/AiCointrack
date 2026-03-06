@@ -4,6 +4,7 @@ import { useAppStore } from "@/store"
 
 export function useBudget() {
   const jwt = useAppStore(state => state.jwt)
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
 
   const query = useQuery({
     queryKey: ["budget"],
@@ -11,7 +12,7 @@ export function useBudget() {
       const response = await getCurrentBudget()
       return response.data
     },
-    enabled: !!jwt,
+    enabled: !!jwt && _hasHydrated,
     staleTime: 30_000,
     refetchOnMount: true,
     refetchInterval: 60_000,
@@ -21,7 +22,6 @@ export function useBudget() {
   return {
     data: query.data,
     isLoading: query.isLoading,
-    isFetching: query.isFetching,
     error: query.error,
     refetch: query.refetch,
   }

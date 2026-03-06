@@ -4,6 +4,7 @@ import { useAppStore } from "@/store"
 
 export function useShoppingLists() {
   const jwt = useAppStore(state => state.jwt)
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
 
   const query = useQuery({
     queryKey: ["shoppingLists"],
@@ -11,7 +12,7 @@ export function useShoppingLists() {
       const response = await getShoppingLists()
       return { lists: response.data || [] }
     },
-    enabled: !!jwt,
+    enabled: !!jwt && _hasHydrated,
     staleTime: 30_000,
     refetchOnMount: true,
     refetchInterval: 60_000,

@@ -9,11 +9,10 @@ export function useTransactions(params?: {
   month?: string
 }) {
   const jwt = useAppStore(state => state.jwt)
-
-  const queryKey = ["transactions", params?.limit, params?.offset, params?.source, params?.month]
+  const _hasHydrated = useAppStore(state => state._hasHydrated)
 
   return useQuery({
-    queryKey,
+    queryKey: ["transactions", params?.limit, params?.offset, params?.source, params?.month],
     queryFn: async () => {
       const response = await getTransactions(params)
       const raw = response.data
@@ -30,7 +29,7 @@ export function useTransactions(params?: {
         })),
       }
     },
-    enabled: !!jwt,
+    enabled: !!jwt && _hasHydrated,
     staleTime: 30_000,
     refetchOnMount: true,
     refetchInterval: 60_000,
