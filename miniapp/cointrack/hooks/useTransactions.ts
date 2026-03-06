@@ -10,8 +10,11 @@ export function useTransactions(params?: {
 }) {
   const jwt = useAppStore(state => state.jwt)
 
+  // Stable key — serialize params so object identity doesn't bust the cache
+  const queryKey = ["transactions", params?.limit, params?.offset, params?.source, params?.month]
+
   return useQuery({
-    queryKey: ["transactions", params],
+    queryKey,
     queryFn: async () => {
       const response = await getTransactions(params)
       const raw = response.data

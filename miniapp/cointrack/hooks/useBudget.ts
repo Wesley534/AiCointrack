@@ -20,7 +20,8 @@ export function useBudget() {
 
   return {
     data: query.data,
-    isLoading: query.isLoading,
+    isLoading: query.isPending && query.fetchStatus === "fetching",
+    isFetching: query.isFetching,
     error: query.error,
     refetch: query.refetch,
   }
