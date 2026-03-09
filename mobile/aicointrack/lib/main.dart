@@ -9,31 +9,39 @@ import 'pages/home_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
 
-/// Application entry point with Firebase initialization
+/// Application entry point.
 void main() async {
-  // Ensure Flutter bindings are initialized before calling async code
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase for all platforms
-  // Uses firebase_options.dart which contains platform-specific configuration
+  // ── Firebase ──────────────────────────────────────────────────────────────
+  // Guard against the "duplicate-app" error that appears during hot-restart:
+  // Firebase.initializeApp throws if a [DEFAULT] app already exists.
+  // Checking Firebase.apps.isEmpty is the correct pattern.
   try {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
+      print('✓ Firebase initialized successfully');
+    } else {
+      // Already initialised (e.g. hot restart) — reuse the existing app.
+      print('✓ Firebase already initialized, reusing existing app');
     }
-    print('✓ Firebase initialized successfully');
   } catch (e) {
+    // Log but don't crash — Google/email login will fail gracefully,
+    // and wallet-only login still works via JWT.
     print('✗ Firebase initialization failed: $e');
   }
 
-  // Initialize WalletConnect early so relay is ready by login time
+  // ── Coinbase Wallet SDK ───────────────────────────────────────────────────
+  // Initialise early so the SDK relay connection is ready before the user
+  // taps "Sign in with Base Wallet".
   try {
     await WalletConnectService.init();
     print('✓ WalletConnect initialized successfully');
   } catch (e) {
+    // Non-fatal — user can still use Google/email login.
     print('✗ WalletConnect init failed: $e');
-    // Non-fatal — user can still use Google/email login
   }
 
   runApp(
@@ -44,8 +52,7 @@ void main() async {
   );
 }
 
-/// Root widget of the application
-/// Manages theme and navigation based on authentication state
+/// Root widget. Manages theme and navigation based on authentication state.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -56,12 +63,13 @@ class MyApp extends StatelessWidget {
         return MaterialApp(
           title: 'CoinTrack',
           debugShowCheckedModeBanner: false,
-          // Use theme system with light/dark mode support
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          // Stream builder to manage navigation based on authentication state
-          // This ensures the user is automatically logged out if their session expires
+          // StreamBuilder gates the entire app behind auth state.
+          // AuthService.appAuthStateChanges() emits true when:
+          //   - Firebase session is active (Google / email / custom token), OR
+          //   - A JWT is stored in SharedPreferences (wallet-only user)
           home: StreamBuilder<bool>(
             stream: AuthService.appAuthStateChanges(),
             builder: (context, snapshot) {
@@ -77,10 +85,9 @@ class MyApp extends StatelessWidget {
                   ),
                 );
               }
-              if (snapshot.data == true) {
-                return const HomePage();
-              }
-              return const LoginPage();
+              return snapshot.data == true
+                  ? const HomePage()
+                  : const LoginPage();
             },
           ),
         );
