@@ -31,7 +31,7 @@ class WalletAuthService {
     final now = '${DateTime.now().toUtc().toIso8601String().split('.')[0]}Z';
     return '$domain wants you to sign in with your Ethereum account:\n'
         '$address\n\n'
-        'Sign in to CoinTrack — AI-powered expense tracker on Base.\n\n'
+        'Sign in to AiCoinTrack — AI-powered expense tracker on Base.\n\n'
         'URI: https://$domain\n'
         'Version: 1\n'
         'Chain ID: 8453\n'
@@ -47,6 +47,9 @@ class WalletAuthService {
   /// Returns a map with keys: address, message, signature.
   /// Throws an [Exception] on any failure.
   Future<Map<String, String>> connectAndSign() async {
+    // Reset any stale session first
+    await CoinbaseWalletSDK.shared.resetSession();
+
     debugPrint('[WalletAuth] Step 1: Initiating handshake...');
 
     final handshakeResults = await CoinbaseWalletSDK.shared.initiateHandshake([

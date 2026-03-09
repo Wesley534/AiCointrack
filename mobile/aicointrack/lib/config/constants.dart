@@ -23,7 +23,7 @@ class AppConstants {
   static const String WALLETCONNECT_PROJECT_ID = 'fec5e6d06b78f02fa5ed0d0cd883b8e5';
 
   // App Configuration
-  static const String APP_NAME = 'CoinTrack';
+  static const String APP_NAME = 'AiCoinTrack';
   static const String APP_VERSION = '1.0.0';
   
   // Timeouts (in seconds)
