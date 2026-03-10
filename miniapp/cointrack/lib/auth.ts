@@ -15,10 +15,10 @@ export async function authenticateWallet(
   }
 
   const message = new SiweMessage({
-    domain: typeof window !== "undefined" ? window.location.host : "cointrack.xyz",
+    domain: typeof window !== "undefined" ? window.location.host : "aicointrack-nu.vercel.app",
     address,
     statement: "Sign in to Cointrack",
-    uri: typeof window !== "undefined" ? window.location.origin : "https://cointrack.xyz",
+    uri: typeof window !== "undefined" ? window.location.origin : "https://aicointrack-nu.vercel.app",
     version: "1",
     chainId,
     nonce,

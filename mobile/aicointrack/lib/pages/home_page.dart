@@ -165,7 +165,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Welcome to CoinTrack',
+                    'Welcome to AiCoinTrack',
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark

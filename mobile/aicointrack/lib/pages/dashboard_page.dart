@@ -239,7 +239,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ),
         ),
-        title: const Text('CoinTrack'),
+        title: const Text('AiCoinTrack'),
         elevation: 0,
         actions: [
           // Notifications icon with badge
