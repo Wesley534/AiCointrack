@@ -2,6 +2,7 @@
 import { ReactNode, useState } from "react";
 import { base } from "wagmi/chains";
 import { WagmiProvider, createConfig, http } from "wagmi";
+import { coinbaseWallet } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import "@coinbase/onchainkit/styles.css";
@@ -9,6 +10,12 @@ import "@coinbase/onchainkit/styles.css";
 const wagmiConfig = createConfig({
     chains: [base],
     transports: { [base.id]: http() },
+    connectors: [
+        coinbaseWallet({
+            appName: "CoinTrack",
+            preference: "smartWalletOnly",
+        }),
+    ],
 });
 
 /**

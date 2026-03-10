@@ -25,22 +25,15 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- Coinbase Wallet SDK callback via HTTPS App Link (Vercel host) -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="cointrack-nu.vercel.app" />
-            </intent-filter>
+        </activity>
 
-            <!-- Custom scheme callback for Coinbase Wallet -->
-            <intent-filter>
+        <activity android:name="com.linusu.flutter_web_auth_2.CallbackActivity" android:exported="true">
+            <intent-filter android:label="flutter_web_auth_2">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="aicointrack" />
             </intent-filter>
-
         </activity>
 
         <meta-data
