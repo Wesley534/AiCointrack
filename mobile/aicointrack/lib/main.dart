@@ -5,6 +5,9 @@ import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'services/auth_service.dart';
 import 'services/token_service.dart';
+import 'services/sync_service.dart';
+import 'services/cache_service.dart';
+import 'db/local_database.dart';
 import 'pages/home_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
@@ -22,6 +25,14 @@ void main() async {
     debugPrint('✓ Firebase initialized');
   } catch (e) {
     debugPrint('✗ Firebase initialization failed: $e');
+  }
+
+  // ── Local SQLite database ──────────────────────────────────────────────────
+  try {
+    await LocalDatabase.database;  // pre-open / create tables
+    debugPrint('✓ Local database initialized');
+  } catch (e) {
+    debugPrint('✗ Local database initialization failed: $e');
   }
 
   // NOTE: ReownAuthService.init() requires a BuildContext, so it is called
@@ -80,11 +91,16 @@ class _AuthGateState extends State<AuthGate> {
       if (current == null) return;
 
       if (isAuth) {
+        // Start background sync when authenticated
+        SyncService.init();
         current.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       } else {
+        // Stop sync and clear cache on logout
+        SyncService.dispose();
+        CacheService.clearAll();
         current.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginPage()),
           (route) => false,
