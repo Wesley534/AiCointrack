@@ -40,13 +40,14 @@ export function LoginProvider({ children }: { children: ReactNode }) {
                             display: "modal",
                             preference: "smartWalletOnly",
                             supportedWallets: {
+                                // @ts-expect-error - missing from types
                                 coinbase_wallet: true,
                                 meta_mask: false,
                                 phantom: false,
                                 rabby: false,
                                 trust: false,
                                 frame: false,
-                            } as any,
+                            },
                         },
                     }}
                 >
