@@ -32,7 +32,10 @@ dependencies:
 
   # ── Auth: External wallets (MetaMask, Rainbow, Trust…) ───────────────────────
   reown_appkit: ^1.4.0
-
+  # ── Offline-first / Local cache ──────────────────────────────────────────
+  sqflite: ^2.4.2
+  path: ^1.9.1
+  connectivity_plus: ^6.1.4
 dev_dependencies:
   flutter_test:
     sdk: flutter

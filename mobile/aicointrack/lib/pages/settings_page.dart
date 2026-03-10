@@ -1,10 +1,81 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 
-/// Settings page mirroring the MVP settings screen.
-class SettingsPage extends StatelessWidget {
+/// Settings page with real user profile data and working controls.
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _isLoading = true;
+  String _userName = '';
+  String _email = '';
+  String _walletLabel = '';
+  bool _mpesaAutoLog = true;
+  bool _bankAutoLog = true;
+  bool _onchainAutoLog = true;
+  bool _isLoggingOut = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await ApiService.fetchUserProfile();
+      if (mounted) {
+        setState(() {
+          _userName = profile['display_name'] as String? ??
+              profile['username'] as String? ??
+              'User';
+          _email = profile['email'] as String? ?? '';
+          final addr = profile['wallet_address'] as String? ?? '';
+          _walletLabel = addr.isNotEmpty
+              ? '${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}'
+              : 'No wallet';
+          // Load preferences if available
+          final prefs = profile['preferences'] as Map<String, dynamic>?;
+          if (prefs != null) {
+            _mpesaAutoLog = prefs['mpesa_auto_log'] as bool? ?? true;
+            _bankAutoLog = prefs['bank_auto_log'] as bool? ?? true;
+            _onchainAutoLog = prefs['onchain_auto_log'] as bool? ?? true;
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _userName = 'User';
+          _email = '';
+          _walletLabel = 'No wallet';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _logout() async {
+    setState(() => _isLoggingOut = true);
+    try {
+      await AuthService.signOut();
+      // The auth gate listener in main.dart will handle navigation
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoggingOut = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Logout failed: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,24 +86,40 @@ class SettingsPage extends StatelessWidget {
     final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
-    final settings = ApiService.exampleSettings;
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: bgColor,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Container(
-      color: bgColor,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 50, 20, 80),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-              ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  color: mutedColor,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Settings',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
+            // Profile card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -53,10 +140,10 @@ class SettingsPage extends StatelessWidget {
                         end: Alignment.bottomRight,
                       ),
                     ),
-                    child: const Center(
+                    child: Center(
                       child: Text(
-                        'J',
-                        style: TextStyle(
+                        _userName.isNotEmpty ? _userName[0].toUpperCase() : '?',
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                           color: Colors.black,
@@ -70,25 +157,26 @@ class SettingsPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          settings.userName,
+                          _userName,
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: textColor,
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          settings.email,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: mutedColor,
+                        if (_email.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            _email,
+                            style: TextStyle(fontSize: 12, color: mutedColor),
                           ),
-                        ),
+                        ],
                         const SizedBox(height: 4),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(8),
                             color: AppColors.accentGreen.withOpacity(0.08),
@@ -109,7 +197,7 @@ class SettingsPage extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                settings.walletLabel,
+                                _walletLabel,
                                 style: const TextStyle(fontSize: 10),
                               ),
                             ],
@@ -122,6 +210,7 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            // Auto-Logging Preferences
             Text(
               'Auto-Logging Preferences'.toUpperCase(),
               style: TextStyle(
@@ -132,37 +221,36 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Column(
-              children: settings.toggles.map((t) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        t.label,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: textColor,
-                        ),
-                      ),
-                      _ToggleSwitch(value: t.enabled),
-                    ],
-                  ),
-                );
-              }).toList(),
+            _ToggleRow(
+              label: 'M-Pesa auto-log',
+              value: _mpesaAutoLog,
+              onChanged: (v) => setState(() => _mpesaAutoLog = v),
+              cardColor: cardColor,
+              borderColor: borderColor,
+              textColor: textColor,
+            ),
+            _ToggleRow(
+              label: 'Bank auto-log',
+              value: _bankAutoLog,
+              onChanged: (v) => setState(() => _bankAutoLog = v),
+              cardColor: cardColor,
+              borderColor: borderColor,
+              textColor: textColor,
+            ),
+            _ToggleRow(
+              label: 'On-chain auto-log',
+              value: _onchainAutoLog,
+              onChanged: (v) => setState(() => _onchainAutoLog = v),
+              cardColor: cardColor,
+              borderColor: borderColor,
+              textColor: textColor,
             ),
             const SizedBox(height: 16),
+            // Logout button
             SizedBox(
               width: double.infinity,
               child: OutlinedButton(
-                onPressed: () {},
+                onPressed: _isLoggingOut ? null : _logout,
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: AppColors.danger.withOpacity(0.5)),
                   foregroundColor: AppColors.danger,
@@ -171,11 +259,61 @@ class SettingsPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                child: const Text('Log out'),
+                child: _isLoggingOut
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Log out'),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ToggleRow extends StatelessWidget {
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color cardColor;
+  final Color borderColor;
+  final Color textColor;
+
+  const _ToggleRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+    required this.cardColor,
+    required this.borderColor,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 13, color: textColor),
+          ),
+          GestureDetector(
+            onTap: () => onChanged(!value),
+            child: _ToggleSwitch(value: value),
+          ),
+        ],
       ),
     );
   }
