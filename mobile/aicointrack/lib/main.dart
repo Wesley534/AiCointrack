@@ -4,45 +4,28 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'services/auth_service.dart';
-import 'services/wallet_connect_service.dart';
 import 'pages/home_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
 
-/// Application entry point.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Firebase ──────────────────────────────────────────────────────────────
-  // Guard against the "duplicate-app" error that appears during hot-restart:
-  // Firebase.initializeApp throws if a [DEFAULT] app already exists.
-  // Checking Firebase.apps.isEmpty is the correct pattern.
+  // ── Firebase ─────────────────────────────────────────────────────────────────
   try {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      print('✓ Firebase initialized successfully');
-    } else {
-      // Already initialised (e.g. hot restart) — reuse the existing app.
-      print('✓ Firebase already initialized, reusing existing app');
     }
+    debugPrint('✓ Firebase initialized');
   } catch (e) {
-    // Log but don't crash — Google/email login will fail gracefully,
-    // and wallet-only login still works via JWT.
-    print('✗ Firebase initialization failed: $e');
+    debugPrint('✗ Firebase initialization failed: $e');
   }
 
-  // ── Coinbase Wallet SDK ───────────────────────────────────────────────────
-  // Initialise early so the SDK relay connection is ready before the user
-  // taps "Sign in with Base Wallet".
-  try {
-    await WalletConnectService.init();
-    print('✓ WalletConnect initialized successfully');
-  } catch (e) {
-    // Non-fatal — user can still use Google/email login.
-    print('✗ WalletConnect init failed: $e');
-  }
+  // NOTE: ReownAuthService.init() requires a BuildContext, so it is called
+  // lazily the first time LoginPage builds — see LoginPage._initReown().
+  // BaseAuthService has no async init — it is fully stateless.
 
   runApp(
     ChangeNotifierProvider(
@@ -52,7 +35,6 @@ void main() async {
   );
 }
 
-/// Root widget. Manages theme and navigation based on authentication state.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -61,15 +43,11 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          title: 'AiCoinTrack',
+          title: 'CoinTrack',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          // StreamBuilder gates the entire app behind auth state.
-          // AuthService.appAuthStateChanges() emits true when:
-          //   - Firebase session is active (Google / email / custom token), OR
-          //   - A JWT is stored in SharedPreferences (wallet-only user)
           home: StreamBuilder<bool>(
             stream: AuthService.appAuthStateChanges(),
             builder: (context, snapshot) {
@@ -85,9 +63,8 @@ class MyApp extends StatelessWidget {
                   ),
                 );
               }
-              return snapshot.data == true
-                  ? const HomePage()
-                  : const LoginPage();
+              if (snapshot.data == true) return const HomePage();
+              return const LoginPage();
             },
           ),
         );

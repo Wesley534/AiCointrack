@@ -21,12 +21,16 @@ class AppConstants {
   
   // WalletConnect — get free project ID from cloud.walletconnect.com
   static const String WALLETCONNECT_PROJECT_ID = 'fec5e6d06b78f02fa5ed0d0cd883b8e5';
+  static const String REOWN_PROJECT_ID = 'fec5e6d06b78f02fa5ed0d0cd883b8e5';
 
   // App Configuration
   static const String APP_NAME = 'AiCoinTrack';
+  static const String APP_DESCRIPTION = 'AI-powered crypto expense tracker on Base';
+  static const String APP_URL = 'https://cointrack-nu.vercel.app';
   static const String APP_VERSION = '1.0.0';
   
   // Timeouts (in seconds)
   static const int HTTP_TIMEOUT = 30;
   static const int AUTH_TOKEN_REFRESH_INTERVAL = 3300; // 55 minutes (tokens valid for 60)
+  static const String APP_ICON_URL = 'https://cointrack-nu.vercel.app/icon.png';
 }

@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
-import '../services/wallet_auth_service.dart';
-import '../services/wallet_connect_service.dart';
+import '../services/base_auth_service.dart';
+import '../services/reown_auth_service.dart';
 import '../firebase_options.dart';
+import '../config/constants.dart';
 import '../config/theme.dart';
 import 'home_page.dart';
 import 'email_login_page.dart';
 
-/// Login page with Google Sign-In, Email, and Base Wallet authentication.
-///
-/// Auth flows available:
-///   1. Google Sign-In  (Firebase OAuth)
-///   2. Email / Password (Firebase Auth)
-///   3. Base Wallet      (Coinbase Wallet SDK → SIWE → backend JWT)
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -21,448 +16,641 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  bool _isLoading = false;
-  bool _isWalletLoading = false;
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
+  // ── Loading flags — one per auth method ──────────────────────────────────────
+  bool _isBaseLoading = false;
+  bool _isGoogleLoading = false;
+  bool _isReownLoading = false;
   String? _errorMessage;
 
-  // ─── Google Sign-In ──────────────────────────────────────────────────────
+  late final AnimationController _fadeCtrl;
+  late final Animation<double> _fadeAnim;
 
+  // ── Lifecycle ────────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
+    super.initState();
+
+    _fadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
+    _fadeCtrl.forward();
+
+    // Init Reown lazily (needs a BuildContext).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initReown());
+  }
+
+  @override
+  void dispose() {
+    _fadeCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initReown() async {
+    if (!mounted) return;
+    try {
+      await ReownAuthService.init(context);
+    } catch (e) {
+      debugPrint('Reown init error (non-fatal): $e');
+    }
+  }
+
+  // ── Navigation helper ─────────────────────────────────────────────────────────
+
+  void _goHome() {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const HomePage()),
+      (r) => false,
+    );
+  }
+
+  // ── Auth handlers ─────────────────────────────────────────────────────────────
+
+  /// Opens the miniapp /login page via flutter_web_auth_2 → Base smart wallet.
+  Future<void> _handleBaseSignIn() async {
+    setState(() {
+      _isBaseLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final success = await BaseAuthService.loginWithBase(context);
+      if (success) {
+        _goHome();
+      } else {
+        // User cancelled — silent dismiss.
+        if (mounted) {
+          setState(() {
+            _isBaseLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Base sign-in failed: ${_friendlyError(e)}';
+          _isBaseLoading = false;
+        });
+      }
+    }
+  }
+
+  /// Google Sign-In via Firebase.
   Future<void> _handleGoogleSignIn() async {
     setState(() {
+      _isGoogleLoading = true;
       _errorMessage = null;
-      _isLoading = true;
     });
-
     try {
-      // Guard: check Firebase is configured (catches copy-paste mistakes)
       if (DefaultFirebaseOptions.currentPlatform.apiKey == 'YOUR_API_KEY') {
         setState(() {
           _errorMessage =
-              'Firebase not configured. Update firebase_options.dart with your credentials.';
-          _isLoading = false;
+              'Firebase not configured. Update firebase_options.dart.';
+          _isGoogleLoading = false;
         });
         return;
       }
-
-      final UserCredential? userCredential =
-          await AuthService.signInWithGoogle();
-
-      if (userCredential == null) {
-        // User cancelled — not an error
-        setState(() {
-          _errorMessage = null;
-          _isLoading = false;
-        });
+      final cred = await AuthService.signInWithGoogle();
+      if (cred == null) {
+        if (mounted) {
+          setState(() {
+            _isGoogleLoading = false;
+          });
+        }
         return;
       }
-
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
-      }
+      _goHome();
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = _getFirebaseErrorMessage(e.code);
-          _isLoading = false;
+          _errorMessage = _getFirebaseError(e.code);
+          _isGoogleLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = 'Unexpected error: $e';
-          _isLoading = false;
+          _errorMessage = 'Google sign-in failed: ${_friendlyError(e)}';
+          _isGoogleLoading = false;
         });
       }
     }
   }
 
-  // ─── Base Wallet Sign-In ─────────────────────────────────────────────────
-
-  /// Handles "Sign in with Base Wallet" button press.
-  ///
-  /// Uses the Coinbase Wallet SDK (not WalletConnect) — no project ID needed.
-  /// Requires Coinbase Wallet or Base Wallet app to be installed on the device.
-  Future<void> _handleBaseWalletSignIn() async {
-    // Ensure the SDK was initialised at startup (should already be, but guard)
-    if (!WalletConnectService.isInitialized) {
-      try {
-        await WalletConnectService.init();
-      } catch (e) {
-        setState(() {
-          _errorMessage = 'Failed to initialise wallet SDK: $e';
-        });
-        return;
-      }
+  /// Reown AppKit — WalletConnect v2 modal (MetaMask, Rainbow, Trust, etc.).
+  Future<void> _handleReownSignIn() async {
+    if (AppConstants.REOWN_PROJECT_ID == 'YOUR_REOWN_PROJECT_ID') {
+      setState(() {
+        _errorMessage =
+            'Reown not configured. Set REOWN_PROJECT_ID in constants.dart.';
+      });
+      return;
     }
-
     setState(() {
+      _isReownLoading = true;
       _errorMessage = null;
-      _isWalletLoading = true;
     });
-
     try {
-      final walletAuth = WalletAuthService();
-      await walletAuth.loginWithWallet();
-
-      // loginWithWallet() has:
-      //   1. Connected to Coinbase/Base Wallet app
-      //   2. Got address + signed SIWE message
-      //   3. Sent to backend → got JWT
-      //   4. Optionally signed into Firebase with custom token
-      //
-      // Either the Firebase stream or the JWT fallback will now emit true,
-      // but we navigate explicitly here for speed (no need to wait for stream).
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
+      final success = await ReownAuthService.loginWithWallet(context);
+      if (success) {
+        _goHome();
+      } else if (mounted) {
+        setState(() {
+          _errorMessage = 'Wallet connection cancelled or failed.';
+          _isReownLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          // Clean up the "Exception: " prefix for cleaner UX
-          _errorMessage = e.toString().replaceFirst('Exception: ', '');
-          _isWalletLoading = false;
+          _errorMessage = 'Wallet sign-in failed: ${_friendlyError(e)}';
+          _isReownLoading = false;
         });
       }
     }
   }
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
+  // ── Error helpers ─────────────────────────────────────────────────────────────
 
-  String _getFirebaseErrorMessage(String code) {
+  String _getFirebaseError(String code) {
     switch (code) {
-      case 'operation-not-allowed':
-        return 'Google Sign-In is not enabled in Firebase Console.';
-      case 'invalid-api-key':
-        return 'Invalid API key — check firebase_options.dart.';
-      case 'network-request-failed':
-        return 'Network error. Check your internet connection.';
+      case 'account-exists-with-different-credential':
+        return 'Account exists with different credentials.';
+      case 'invalid-credential':
+        return 'Invalid credentials.';
       case 'user-disabled':
         return 'This account has been disabled.';
+      case 'user-not-found':
+        return 'No account found.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection.';
       default:
-        return 'Authentication failed: $code';
+        return 'Sign-in failed ($code).';
     }
   }
 
-  // ─── Build ───────────────────────────────────────────────────────────────
+  String _friendlyError(Object e) {
+    final s = e.toString();
+    // Strip "Exception: " prefix for cleaner display.
+    return s.replaceFirst('Exception: ', '');
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
     final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-    final borderColor = isDark
-        ? AppColors.darkBorder
-        : AppColors.lightBorder;
-    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
+    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
-    final bool anyLoading = _isLoading || _isWalletLoading;
+    final anyLoading = _isBaseLoading || _isGoogleLoading || _isReownLoading;
 
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Logo / Brand ──────────────────────────────────────────────
-              const SizedBox(height: 32),
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.accentGreen.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: AppColors.accentGreen.withOpacity(0.25),
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SingleChildScrollView(
+            physics: const ClampingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 56),
+
+                  // ── Header ──────────────────────────────────────────────────
+                  _Header(textColor: textColor, mutedColor: mutedColor),
+                  const SizedBox(height: 40),
+
+                  // ── Error banner ────────────────────────────────────────────
+                  if (_errorMessage != null) ...[
+                    _ErrorBanner(
+                      message: _errorMessage!,
+                      onDismiss: () => setState(() => _errorMessage = null),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Primary: Sign in with Base ──────────────────────────────
+                  _PrimaryButton(
+                    id: 'btn-sign-in-base',
+                    label: 'Sign in with Base',
+                    sublabel: 'Passkey · no seed phrase',
+                    loading: _isBaseLoading,
+                    disabled: anyLoading,
+                    icon: Icons.fingerprint_rounded,
+                    onPressed: _handleBaseSignIn,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Google ──────────────────────────────────────────────────
+                  _SecondaryButton(
+                    id: 'btn-sign-in-google',
+                    label: 'Sign in with Google',
+                    loading: _isGoogleLoading,
+                    disabled: anyLoading,
+                    borderColor: borderColor,
+                    mutedColor: mutedColor,
+                    onPressed: _handleGoogleSignIn,
+                    iconWidget: _GoogleIcon(),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── Email ───────────────────────────────────────────────────
+                  _SecondaryButton(
+                    id: 'btn-sign-in-email',
+                    label: 'Sign in with Email',
+                    loading: false,
+                    disabled: anyLoading,
+                    borderColor: borderColor,
+                    mutedColor: mutedColor,
+                    icon: Icons.email_outlined,
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const EmailLoginPage(isSignUp: false),
+                      ),
                     ),
                   ),
-                  child: const Icon(
-                    Icons.currency_bitcoin,
-                    color: AppColors.accentGreen,
-                    size: 32,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Center(
-                child: Text(
-                  'CoinTrack',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: textColor,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Text(
-                  'AI-powered crypto expense tracker\non Base',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: mutedColor,
-                    height: 1.5,
-                  ),
-                ),
-              ),
+                  const SizedBox(height: 28),
 
-              const SizedBox(height: 48),
+                  // ── Divider ─────────────────────────────────────────────────
+                  _Divider(
+                    color: borderColor,
+                    mutedColor: mutedColor,
+                    label: 'or connect existing wallet',
+                  ),
+                  const SizedBox(height: 20),
 
-              // ── Error Banner ──────────────────────────────────────────────
-              if (_errorMessage != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  // ── Reown: other wallets ────────────────────────────────────
+                  _SecondaryButton(
+                    id: 'btn-connect-other-wallet',
+                    label: 'Connect other wallet',
+                    sublabel: 'MetaMask, Rainbow, Trust & 400+ wallets',
+                    loading: _isReownLoading,
+                    disabled: anyLoading,
+                    borderColor: AppColors.accentGreen.withValues(alpha: 0.4),
+                    mutedColor: mutedColor,
+                    accentColor: AppColors.accentGreen,
+                    icon: Icons.link_rounded,
+                    onPressed: _handleReownSignIn,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger.withOpacity(0.1),
-                    border: Border.all(color: AppColors.danger.withOpacity(0.3)),
-                    borderRadius: BorderRadius.circular(12),
+
+                  const SizedBox(height: 40),
+                  Center(
+                    child: Text(
+                      'By signing in you agree to our Terms of Service.',
+                      style: TextStyle(fontSize: 11, color: mutedColor),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  child: Row(
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Header widget ─────────────────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  const _Header({required this.textColor, required this.mutedColor});
+  final Color textColor;
+  final Color mutedColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1A3A6B), Color(0xFF0052FF)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x400052FF),
+                blurRadius: 20,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Text('💰', style: TextStyle(fontSize: 34)),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'CoinTrack',
+          style: TextStyle(
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            color: textColor,
+            letterSpacing: -0.5,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Your all-in-one crypto & expense tracker',
+          style: TextStyle(fontSize: 14, color: mutedColor, height: 1.5),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+// ── Error banner ──────────────────────────────────────────────────────────────
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message, required this.onDismiss});
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              size: 16,
+              color: Colors.redAccent,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onDismiss,
+            child: const Icon(Icons.close, size: 16, color: Colors.redAccent),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Primary "Sign in with Base" button ───────────────────────────────────────
+
+class _PrimaryButton extends StatelessWidget {
+  const _PrimaryButton({
+    required this.id,
+    required this.label,
+    required this.sublabel,
+    required this.loading,
+    required this.disabled,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String id;
+  final String label;
+  final String sublabel;
+  final bool loading;
+  final bool disabled;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 64,
+      child: ElevatedButton(
+        key: Key(id),
+        onPressed: disabled ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0052FF),
+          disabledBackgroundColor: const Color(
+            0xFF0052FF,
+          ).withValues(alpha: 0.5),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: loading
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 22, color: Colors.white),
+                  const SizedBox(width: 10),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: AppColors.danger,
-                        size: 18,
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: AppColors.danger,
-                            fontSize: 13,
-                          ),
+                      Text(
+                        sublabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white.withValues(alpha: 0.68),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-              ],
-
-              // ── Primary CTA: Base Wallet ──────────────────────────────────
-              // Shown first and most prominently — this is the Base-native flow
-              SizedBox(
-                width: double.infinity,
-                height: 54,
-                child: ElevatedButton.icon(
-                  onPressed: anyLoading ? null : _handleBaseWalletSignIn,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentGreen,
-                    foregroundColor: Colors.black,
-                    disabledBackgroundColor:
-                        AppColors.accentGreen.withOpacity(0.5),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: _isWalletLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
-                          ),
-                        )
-                      : const Icon(Icons.account_balance_wallet, size: 20),
-                  label: Text(
-                    _isWalletLoading
-                        ? 'Waiting for Base Wallet…'
-                        : 'Continue with Base Wallet',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ── Divider ───────────────────────────────────────────────────
-              Row(
-                children: [
-                  Expanded(child: Divider(color: borderColor)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'or',
-                      style: TextStyle(color: mutedColor, fontSize: 13),
-                    ),
-                  ),
-                  Expanded(child: Divider(color: borderColor)),
                 ],
               ),
+      ),
+    );
+  }
+}
 
-              const SizedBox(height: 16),
+// ── Secondary outlined button ─────────────────────────────────────────────────
 
-              // ── Google Sign-In ────────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: anyLoading ? null : _handleGoogleSignIn,
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: textColor,
-                    side: BorderSide(color: borderColor),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: _isLoading
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: mutedColor,
-                          ),
-                        )
-                      : const Icon(Icons.g_mobiledata, size: 22),
-                  label: Text(
-                    'Sign in with Google',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: textColor,
-                    ),
-                  ),
+class _SecondaryButton extends StatelessWidget {
+  const _SecondaryButton({
+    required this.id,
+    required this.label,
+    required this.loading,
+    required this.disabled,
+    required this.borderColor,
+    required this.mutedColor,
+    required this.onPressed,
+    this.sublabel,
+    this.icon,
+    this.iconWidget,
+    this.accentColor,
+  });
+
+  final String id;
+  final String label;
+  final String? sublabel;
+  final bool loading;
+  final bool disabled;
+  final Color borderColor;
+  final Color mutedColor;
+  final Color? accentColor;
+  final IconData? icon;
+  final Widget? iconWidget;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = accentColor ?? mutedColor;
+    return SizedBox(
+      width: double.infinity,
+      height: sublabel != null ? 62 : 52,
+      child: OutlinedButton(
+        key: Key(id),
+        onPressed: disabled ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: foreground,
+          side: BorderSide(
+            color: disabled ? borderColor.withValues(alpha: 0.4) : borderColor,
+          ),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: loading
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(foreground),
                 ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── Email ─────────────────────────────────────────────────────
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: anyLoading
-                      ? null
-                      : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const EmailLoginPage(isSignUp: false),
-                            ),
-                          );
-                        },
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: textColor,
-                    side: BorderSide(color: borderColor),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.email_outlined, size: 20),
-                  label: Text(
-                    'Sign in with email',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: textColor,
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // ── Sign Up Link ──────────────────────────────────────────────
-              Center(
-                child: GestureDetector(
-                  onTap: anyLoading
-                      ? null
-                      : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const EmailLoginPage(isSignUp: true),
-                            ),
-                          );
-                        },
-                  child: RichText(
-                    text: TextSpan(
-                      text: "Don't have an account? ",
-                      style: TextStyle(color: mutedColor, fontSize: 13),
-                      children: [
-                        TextSpan(
-                          text: 'Sign up',
-                          style: TextStyle(
-                            color: AppColors.accentGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (iconWidget != null) ...[
+                        iconWidget!,
+                        const SizedBox(width: 8),
+                      ] else if (icon != null) ...[
+                        Icon(icon, size: 18, color: foreground),
+                        const SizedBox(width: 8),
                       ],
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 32),
-
-              // ── Base Chain Badge ──────────────────────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.accentGreen.withOpacity(0.06),
-                  border: Border.all(
-                    color: AppColors.accentGreen.withOpacity(0.18),
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.accentGreen,
-                        shape: BoxShape.circle,
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: foreground,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Built on Base · Secured by Firebase · Your keys, your coins',
-                        style: TextStyle(fontSize: 11, color: mutedColor),
+                    ],
+                  ),
+                  if (sublabel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      sublabel!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: mutedColor,
+                        height: 1.2,
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
+      ),
+    );
+  }
+}
 
-              SizedBox(height: MediaQuery.of(context).size.height * 0.06),
-            ],
-          ),
+// ── Divider with label ────────────────────────────────────────────────────────
+
+class _Divider extends StatelessWidget {
+  const _Divider({
+    required this.color,
+    required this.mutedColor,
+    required this.label,
+  });
+
+  final Color color;
+  final Color mutedColor;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Divider(color: color, thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(label, style: TextStyle(fontSize: 11, color: mutedColor)),
         ),
+        Expanded(child: Divider(color: color, thickness: 1)),
+      ],
+    );
+  }
+}
+
+// ── Google coloured "G" icon ──────────────────────────────────────────────────
+
+class _GoogleIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const Text(
+      'G',
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF4285F4),
+        height: 1,
       ),
     );
   }

@@ -7,7 +7,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -60,25 +60,32 @@
             <data android:mimeType="text/plain"/>
         </intent>
 
-        <!-- Coinbase Wallet app package (preferred — direct package query) -->
+        <!-- Coinbase / Base Wallet (existing) -->
         <package android:name="org.toshi" />
-
-        <!-- Fallback: detect Coinbase Wallet by its custom scheme -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="cbwallet" />
         </intent>
 
-        <!-- HTTPS deep links (url_launcher, Firebase Dynamic Links) -->
+        <!-- Deep-link schemes used by WalletConnect / AppKit -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
-
-        <!-- WalletConnect relay (kept for future WC usage) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="wc" />
         </intent>
+
+        <!-- Popular wallets detected by Reown AppKit (NEW) -->
+        <package android:name="io.metamask" />
+        <package android:name="com.wallet.crypto.trustapp" />
+        <package android:name="io.gnosis.safe" />
+        <package android:name="me.rainbow" />
+        <package android:name="io.zerion.android" />
+        <package android:name="com.imtoken.app" />
+        <package android:name="io.leapwallet.cosmos" />
+        <package android:name="com.uniswap.mobile" />
+        <package android:name="io.argent.android" />
     </queries>
 </manifest>
