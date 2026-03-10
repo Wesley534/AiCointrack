@@ -39,6 +39,14 @@ export function LoginProvider({ children }: { children: ReactNode }) {
                         wallet: {
                             display: "modal",
                             preference: "smartWalletOnly",
+                            supportedWallets: {
+                                coinbase_wallet: true,
+                                meta_mask: false,
+                                phantom: false,
+                                rabby: false,
+                                trust: false,
+                                frame: false,
+                            } as any,
                         },
                     }}
                 >
