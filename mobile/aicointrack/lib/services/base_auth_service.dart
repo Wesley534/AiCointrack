@@ -5,6 +5,8 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 import 'token_service.dart';
+import '../main.dart' show navigatorKey;
+import '../pages/home_page.dart';
 
 /// Handles "Sign in with Base" using the miniapp /login page.
 ///
@@ -49,9 +51,10 @@ class BaseAuthService {
         options: const FlutterWebAuth2Options(
           // Keep the browser session alive so the passkey/Face-ID flow works.
           preferEphemeral: false,
-          // On Android, use a Custom Tab so the user can see the secure-site
-          // indicator rather than a plain WebView.
-          intentFlags: ephemeralIntentFlags,
+          // Do NOT use ephemeralIntentFlags — on some Android OEMs (Infinix,
+          // Tecno, etc.) FLAG_ACTIVITY_NO_HISTORY prevents the Custom Tab
+          // from properly forwarding the aicointrack:// redirect to the
+          // CallbackActivity, causing the WebView to hang instead of dismissing.
         ),
       );
 
@@ -97,9 +100,17 @@ class BaseAuthService {
           await AuthService.signInWithCustomToken(firebaseToken);
           debugPrint('✓ BaseAuth: Firebase custom-token sign-in complete');
         } catch (e) {
-          // Non-fatal — the app can still function with just the JWT.
           debugPrint('BaseAuth: Firebase custom-token sign-in skipped: $e');
         }
+      }
+
+      // ── 6. Force navigation regardless of stream timing ──────────────────────
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
       }
 
       return true;
