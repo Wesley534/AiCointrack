@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'services/auth_service.dart';
+import 'services/token_service.dart';
 import 'pages/home_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
@@ -35,6 +36,8 @@ void main() async {
   );
 }
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -43,31 +46,74 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'CoinTrack',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          home: StreamBuilder<bool>(
-            stream: AuthService.appAuthStateChanges(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Scaffold(
-                  backgroundColor: AppTheme.darkTheme.scaffoldBackgroundColor,
-                  body: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        AppColors.accentGreen,
-                      ),
-                    ),
-                  ),
-                );
-              }
-              if (snapshot.data == true) return const HomePage();
-              return const LoginPage();
-            },
-          ),
+          home: const AuthGate(),
         );
+      },
+    );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  @override
+  void initState() {
+    super.initState();
+    _listenToAuth();
+  }
+
+  void _listenToAuth() {
+    AuthService.appAuthStateChanges().listen((isAuth) {
+      if (!mounted) return;
+      final current = navigatorKey.currentState;
+      if (current == null) return;
+
+      if (isAuth) {
+        current.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
+      } else {
+        current.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Show splash while auth resolves
+    return FutureBuilder<String?>(
+      future: TokenService.getJwt(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            backgroundColor: AppTheme.darkTheme.scaffoldBackgroundColor,
+            body: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.accentGreen),
+              ),
+            ),
+          );
+        }
+        // JWT exists → go straight to app
+        if (snapshot.data != null && snapshot.data!.isNotEmpty) {
+          return const HomePage();
+        }
+        return const LoginPage();
       },
     );
   }

@@ -6,7 +6,6 @@ import '../services/reown_auth_service.dart';
 import '../firebase_options.dart';
 import '../config/constants.dart';
 import '../config/theme.dart';
-import 'home_page.dart';
 import 'email_login_page.dart';
 
 class LoginPage extends StatefulWidget {
@@ -59,16 +58,6 @@ class _LoginPageState extends State<LoginPage>
     }
   }
 
-  // ── Navigation helper ─────────────────────────────────────────────────────────
-
-  void _goHome() {
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomePage()),
-      (r) => false,
-    );
-  }
-
   // ── Auth handlers ─────────────────────────────────────────────────────────────
 
   /// Opens the miniapp /login page via flutter_web_auth_2 → Base smart wallet.
@@ -79,16 +68,12 @@ class _LoginPageState extends State<LoginPage>
     });
     try {
       final success = await BaseAuthService.loginWithBase(context);
-      if (success) {
-        _goHome();
-      } else {
+      if (!success && mounted) {
         // User cancelled — silent dismiss.
-        if (mounted) {
-          setState(() {
-            _isBaseLoading = false;
-          });
-        }
+        setState(() { _isBaseLoading = false; });
       }
+      // On success the StreamBuilder in main.dart detects the auth state
+      // change (Firebase + JWT) and swaps LoginPage → HomePage automatically.
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -115,15 +100,12 @@ class _LoginPageState extends State<LoginPage>
         return;
       }
       final cred = await AuthService.signInWithGoogle();
-      if (cred == null) {
-        if (mounted) {
-          setState(() {
-            _isGoogleLoading = false;
-          });
-        }
+      if (cred == null && mounted) {
+        setState(() { _isGoogleLoading = false; });
         return;
       }
-      _goHome();
+      // On success the StreamBuilder in main.dart detects the Firebase auth
+      // state change and swaps LoginPage → HomePage automatically.
     } on FirebaseAuthException catch (e) {
       if (mounted) {
         setState(() {
@@ -156,14 +138,14 @@ class _LoginPageState extends State<LoginPage>
     });
     try {
       final success = await ReownAuthService.loginWithWallet(context);
-      if (success) {
-        _goHome();
-      } else if (mounted) {
+      if (!success && mounted) {
         setState(() {
           _errorMessage = 'Wallet connection cancelled or failed.';
           _isReownLoading = false;
         });
       }
+      // On success the StreamBuilder in main.dart detects the auth state
+      // change and swaps LoginPage → HomePage automatically.
     } catch (e) {
       if (mounted) {
         setState(() {

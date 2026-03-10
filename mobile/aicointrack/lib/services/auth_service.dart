@@ -85,7 +85,7 @@ class AuthService {
     try {
       await _firebaseAuth.signOut();
       // Google sign-out is a no-op if the user didn't sign in with Google
-      await _googleSignIn.signOut().catchError((_) {});
+      await _googleSignIn.signOut().catchError((_) => null);
       await TokenService.clearJwt();
     } catch (e) {
       throw Exception('Failed to sign out: $e');
@@ -142,12 +142,16 @@ class AuthService {
   /// This means wallet users who never get a Firebase session are still treated
   /// as signed-in as long as their JWT is present in SharedPreferences.
   static Stream<bool> appAuthStateChanges() async* {
+    // First, immediately check JWT so there's no flicker on hot restart
+    final initialJwt = await TokenService.getJwt();
+    if (initialJwt != null && initialJwt.isNotEmpty) {
+      yield true;
+    }
+
     await for (final user in _firebaseAuth.authStateChanges()) {
       if (user != null) {
-        // Firebase session active — always authenticated
         yield true;
       } else {
-        // No Firebase session — fall back to JWT check for wallet-only users
         final jwt = await TokenService.getJwt();
         yield jwt != null && jwt.isNotEmpty;
       }
