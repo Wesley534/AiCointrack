@@ -8,52 +8,37 @@ import { OnchainKitProvider } from "@coinbase/onchainkit";
 import "@coinbase/onchainkit/styles.css";
 
 const wagmiConfig = createConfig({
-    chains: [base],
-    transports: { [base.id]: http() },
-    connectors: [
-        coinbaseWallet({
-            appName: "CoinTrack",
-            preference: "smartWalletOnly",
-        }),
-    ],
+  chains: [base],
+  transports: { [base.id]: http() },
+  connectors: [
+    coinbaseWallet({
+      appName: "CoinTrack",
+      preference: "smartWalletOnly", // ← Coinbase only, no Phantom
+    }),
+  ],
 });
 
-/**
- * Minimal provider for the /login route.
- * Key difference from RootProvider:
- *   - preference: "smartWalletOnly" — forces Base smart wallet / passkey flow
- *   - No BottomNav, no ThemeWrapper, no SafeArea
- */
 export function LoginProvider({ children }: { children: ReactNode }) {
-    const [queryClient] = useState(() => new QueryClient({
-        defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
-    }));
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: 30_000 } },
+  }));
 
-    return (
-        <WagmiProvider config={wagmiConfig}>
-            <QueryClientProvider client={queryClient}>
-                <OnchainKitProvider
-                    apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
-                    chain={base}
-                    config={{
-                        wallet: {
-                            display: "modal",
-                            preference: "smartWalletOnly",
-                            supportedWallets: {
-                                // @ts-expect-error - missing from types
-                                coinbase_wallet: true,
-                                meta_mask: false,
-                                phantom: false,
-                                rabby: false,
-                                trust: false,
-                                frame: false,
-                            },
-                        },
-                    }}
-                >
-                    {children}
-                </OnchainKitProvider>
-            </QueryClientProvider>
-        </WagmiProvider>
-    );
+  return (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <OnchainKitProvider
+          apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+          chain={base}
+          config={{
+            wallet: {
+              display: "modal",
+              preference: "smartWalletOnly",
+            },
+          }}
+        >
+          {children}
+        </OnchainKitProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
 }

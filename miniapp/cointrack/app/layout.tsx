@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { SafeArea } from "@coinbase/onchainkit/minikit";
 import { minikitConfig } from "@/minikit.config";
-import { RootProvider } from "./rootProvider";
 import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -24,28 +22,18 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+const themeScript = `(function(){var t=localStorage.getItem("cointrack_theme");t==="light"||t==="dark"?document.documentElement.setAttribute("data-theme",t):document.documentElement.setAttribute("data-theme","dark");})();`;
+
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){var t=localStorage.getItem("cointrack_theme");t==="light"||t==="dark"?document.documentElement.setAttribute("data-theme",t):document.documentElement.setAttribute("data-theme","dark");})();`,
-          }}
-        />
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body style={{ margin: 0, padding: 0, fontFamily: "'Outfit', sans-serif" }}>
-        <RootProvider>
-          <SafeArea>
-            <main style={{ paddingBottom: 72, maxWidth: 390, margin: "0 auto" }}>
-              {children}
-            </main>
-          </SafeArea>
-        </RootProvider>
+        {children}
       </body>
     </html>
   );
