@@ -4,13 +4,16 @@ import '../services/auth_service.dart';
 import '../services/wallet_auth_service.dart';
 import '../services/wallet_connect_service.dart';
 import '../firebase_options.dart';
-import '../config/constants.dart';
 import '../config/theme.dart';
 import 'home_page.dart';
 import 'email_login_page.dart';
 
-/// Login page with Google Sign-In authentication
-/// Handles user authentication flow and navigation to home page
+/// Login page with Google Sign-In, Email, and Base Wallet authentication.
+///
+/// Auth flows available:
+///   1. Google Sign-In  (Firebase OAuth)
+///   2. Email / Password (Firebase Auth)
+///   3. Base Wallet      (Coinbase Wallet SDK → SIWE → backend JWT)
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -23,80 +26,77 @@ class _LoginPageState extends State<LoginPage> {
   bool _isWalletLoading = false;
   String? _errorMessage;
 
-  /// Handle Google Sign-In button press
+  // ─── Google Sign-In ──────────────────────────────────────────────────────
+
   Future<void> _handleGoogleSignIn() async {
-    // Clear previous error messages
     setState(() {
       _errorMessage = null;
       _isLoading = true;
     });
 
     try {
-      // Check if Firebase is configured
+      // Guard: check Firebase is configured (catches copy-paste mistakes)
       if (DefaultFirebaseOptions.currentPlatform.apiKey == 'YOUR_API_KEY') {
-        if (mounted) {
-          setState(() {
-            _errorMessage =
-                'Firebase not configured yet. Please update firebase_options.dart with your Firebase credentials. See SETUP_CHECKLIST.md for details.';
-            _isLoading = false;
-          });
-        }
+        setState(() {
+          _errorMessage =
+              'Firebase not configured. Update firebase_options.dart with your credentials.';
+          _isLoading = false;
+        });
         return;
       }
 
-      // Attempt to sign in with Google
       final UserCredential? userCredential =
           await AuthService.signInWithGoogle();
 
       if (userCredential == null) {
-        // User canceled the sign-in
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'Sign-in cancelled by user';
-            _isLoading = false;
-          });
-        }
+        // User cancelled — not an error
+        setState(() {
+          _errorMessage = null;
+          _isLoading = false;
+        });
         return;
       }
 
-      // Sign-in successful, navigate to home page
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
-      // Handle Firebase authentication errors
       if (mounted) {
         setState(() {
-          _errorMessage = _getErrorMessage(e.code);
+          _errorMessage = _getFirebaseErrorMessage(e.code);
           _isLoading = false;
         });
       }
     } catch (e) {
-      // Handle other unexpected errors
       if (mounted) {
         setState(() {
-          _errorMessage = 'An unexpected error occurred: $e';
+          _errorMessage = 'Unexpected error: $e';
           _isLoading = false;
         });
       }
     }
   }
 
-  /// Handle Base Wallet sign-in via WalletConnect
+  // ─── Base Wallet Sign-In ─────────────────────────────────────────────────
+
+  /// Handles "Sign in with Base Wallet" button press.
+  ///
+  /// Uses the Coinbase Wallet SDK (not WalletConnect) — no project ID needed.
+  /// Requires Coinbase Wallet or Base Wallet app to be installed on the device.
   Future<void> _handleBaseWalletSignIn() async {
-    if (AppConstants.WALLETCONNECT_PROJECT_ID ==
-        'YOUR_WALLETCONNECT_PROJECT_ID') {
-      if (mounted) {
+    // Ensure the SDK was initialised at startup (should already be, but guard)
+    if (!WalletConnectService.isInitialized) {
+      try {
+        await WalletConnectService.init();
+      } catch (e) {
         setState(() {
-          _errorMessage =
-              'WalletConnect not configured. Add WALLETCONNECT_PROJECT_ID in constants.dart. '
-              'Get a free project ID at cloud.walletconnect.com';
+          _errorMessage = 'Failed to initialise wallet SDK: $e';
         });
+        return;
       }
-      return;
     }
 
     setState(() {
@@ -108,15 +108,24 @@ class _LoginPageState extends State<LoginPage> {
       final walletAuth = WalletAuthService();
       await walletAuth.loginWithWallet();
 
+      // loginWithWallet() has:
+      //   1. Connected to Coinbase/Base Wallet app
+      //   2. Got address + signed SIWE message
+      //   3. Sent to backend → got JWT
+      //   4. Optionally signed into Firebase with custom token
+      //
+      // Either the Firebase stream or the JWT fallback will now emit true,
+      // but we navigate explicitly here for speed (no need to wait for stream).
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() {
+          // Clean up the "Exception: " prefix for cleaner UX
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
           _isWalletLoading = false;
         });
@@ -124,21 +133,24 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  /// Map Firebase error codes to user-friendly messages
-  String _getErrorMessage(String errorCode) {
-    switch (errorCode) {
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  String _getFirebaseErrorMessage(String code) {
+    switch (code) {
       case 'operation-not-allowed':
-        return 'Google Sign-In is not enabled in Firebase Console';
+        return 'Google Sign-In is not enabled in Firebase Console.';
       case 'invalid-api-key':
-        return 'Invalid API key. Check firebase_options.dart';
+        return 'Invalid API key — check firebase_options.dart.';
       case 'network-request-failed':
-        return 'Network error. Please check your internet connection';
+        return 'Network error. Check your internet connection.';
       case 'user-disabled':
-        return 'This user account has been disabled';
+        return 'This account has been disabled.';
       default:
-        return 'Authentication failed: $errorCode';
+        return 'Authentication failed: $code';
     }
   }
+
+  // ─── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -146,207 +158,118 @@ class _LoginPageState extends State<LoginPage> {
     final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
     final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    final borderColor = isDark
+        ? AppColors.darkBorder
+        : AppColors.lightBorder;
+    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
 
-    // Check if user is already signed in
-    if (AuthService.isUserSignedIn()) {
-      // Redirect to home page if already logged in
-      Future.microtask(() {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
-          (route) => false,
-        );
-      });
-    }
+    final bool anyLoading = _isLoading || _isWalletLoading;
 
     return Scaffold(
       backgroundColor: bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Add spacing from top
-              SizedBox(height: MediaQuery.of(context).size.height * 0.1),
-
-              // App Logo or Title
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  gradient: const LinearGradient(
-                    colors: [AppColors.accentGreen, AppColors.purple],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              // ── Logo / Brand ──────────────────────────────────────────────
+              const SizedBox(height: 32),
+              Center(
+                child: Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentGreen.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: AppColors.accentGreen.withOpacity(0.25),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.currency_bitcoin,
+                    color: AppColors.accentGreen,
+                    size: 32,
                   ),
                 ),
-                child: const Center(
-                  child: Text('💰', style: TextStyle(fontSize: 40)),
-                ),
               ),
-
               const SizedBox(height: 24),
-
-              // App Title
-              Text(
-                'CoinTrack',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  letterSpacing: -0.5,
+              Center(
+                child: Text(
+                  'CoinTrack',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-                textAlign: TextAlign.center,
               ),
-
-              const SizedBox(height: 12),
-
-              // Subtitle
-              Text(
-                'Your AI-powered money companion\n— tracks every shilling, automatically.',
-                style: TextStyle(fontSize: 14, color: mutedColor, height: 1.5),
-                textAlign: TextAlign.center,
+              const SizedBox(height: 8),
+              Center(
+                child: Text(
+                  'AI-powered crypto expense tracker\non Base',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: mutedColor,
+                    height: 1.5,
+                  ),
+                ),
               ),
 
               const SizedBox(height: 48),
 
-              // Error Message Display
-              if (_errorMessage != null)
+              // ── Error Banner ──────────────────────────────────────────────
+              if (_errorMessage != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.danger.withOpacity(0.1),
-                    border: Border.all(color: AppColors.danger),
-                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.danger.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.danger),
-                      const SizedBox(width: 12),
+                      Icon(
+                        Icons.error_outline,
+                        color: AppColors.danger,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: const TextStyle(color: AppColors.danger),
+                          style: TextStyle(
+                            color: AppColors.danger,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
+              ],
 
-              const SizedBox(height: 32),
-
-              // Google Sign-In Button
+              // ── Primary CTA: Base Wallet ──────────────────────────────────
+              // Shown first and most prominently — this is the Base-native flow
               SizedBox(
                 width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleGoogleSignIn,
+                height: 54,
+                child: ElevatedButton.icon(
+                  onPressed: anyLoading ? null : _handleBaseWalletSignIn,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accentGreen,
                     foregroundColor: Colors.black,
+                    disabledBackgroundColor:
+                        AppColors.accentGreen.withOpacity(0.5),
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    disabledBackgroundColor: AppColors.accentGreen.withOpacity(
-                      0.5,
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.black,
-                            ),
-                          ),
-                        )
-                      : const Text(
-                          'Get Started',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Sign in with Google (explicit)
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: _isLoading ? null : _handleGoogleSignIn,
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: mutedColor,
-                    side: BorderSide(color: borderColor),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-              // Email/password
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  const EmailLoginPage(isSignUp: false),
-                            ),
-                          );
-                        },
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: mutedColor,
-                    side: BorderSide(color: borderColor),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: const Text(
-                    'Sign in with email',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-              // Sign in with Base Wallet (WalletConnect)
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: (_isLoading || _isWalletLoading)
-                      ? null
-                      : _handleBaseWalletSignIn,
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: mutedColor,
-                    side: BorderSide(color: borderColor),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -355,38 +278,167 @@ class _LoginPageState extends State<LoginPage> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
                         )
                       : const Icon(Icons.account_balance_wallet, size: 20),
                   label: Text(
                     _isWalletLoading
-                        ? 'Waiting for Base app...'
-                        : 'Sign in with Base Wallet',
+                        ? 'Waiting for Base Wallet…'
+                        : 'Continue with Base Wallet',
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-              // Base Chain Badge
+              // ── Divider ───────────────────────────────────────────────────
+              Row(
+                children: [
+                  Expanded(child: Divider(color: borderColor)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'or',
+                      style: TextStyle(color: mutedColor, fontSize: 13),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: borderColor)),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Google Sign-In ────────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: anyLoading ? null : _handleGoogleSignIn,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: textColor,
+                    side: BorderSide(color: borderColor),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: _isLoading
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: mutedColor,
+                          ),
+                        )
+                      : const Icon(Icons.g_mobiledata, size: 22),
+                  label: Text(
+                    'Sign in with Google',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── Email ─────────────────────────────────────────────────────
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: anyLoading
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const EmailLoginPage(isSignUp: false),
+                            ),
+                          );
+                        },
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: textColor,
+                    side: BorderSide(color: borderColor),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.email_outlined, size: 20),
+                  label: Text(
+                    'Sign in with email',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Sign Up Link ──────────────────────────────────────────────
+              Center(
+                child: GestureDetector(
+                  onTap: anyLoading
+                      ? null
+                      : () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const EmailLoginPage(isSignUp: true),
+                            ),
+                          );
+                        },
+                  child: RichText(
+                    text: TextSpan(
+                      text: "Don't have an account? ",
+                      style: TextStyle(color: mutedColor, fontSize: 13),
+                      children: [
+                        TextSpan(
+                          text: 'Sign up',
+                          style: TextStyle(
+                            color: AppColors.accentGreen,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // ── Base Chain Badge ──────────────────────────────────────────
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.accentGreen.withOpacity(0.08),
+                  color: AppColors.accentGreen.withOpacity(0.06),
                   border: Border.all(
-                    color: AppColors.accentGreen.withOpacity(0.2),
+                    color: AppColors.accentGreen.withOpacity(0.18),
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 8,
@@ -399,7 +451,7 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Powered by Firebase — your data is secure',
+                        'Built on Base · Secured by Firebase · Your keys, your coins',
                         style: TextStyle(fontSize: 11, color: mutedColor),
                       ),
                     ),
@@ -407,8 +459,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
 
-              // Bottom spacing
-              SizedBox(height: MediaQuery.of(context).size.height * 0.1),
+              SizedBox(height: MediaQuery.of(context).size.height * 0.06),
             ],
           ),
         ),
