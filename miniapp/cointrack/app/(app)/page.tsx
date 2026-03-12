@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAccount, useSignMessage } from "wagmi"
 import { useMiniKit } from "@coinbase/onchainkit/minikit"
+import { AxiosError } from "axios"
 import { authenticateWallet } from "@/lib/auth"
 import { getMe } from "@/lib/api"
 import { useAppStore } from "@/store"
@@ -89,18 +90,18 @@ export default function Page() {
       } catch (err: unknown) {
         console.error("❌ Auth error:", err)
 
-        const axiosErr = err as any
+        const axiosErr = err as AxiosError
         if (axiosErr?.response) {
           console.error("Response status:", axiosErr.response.status)
           console.error("Response data:", JSON.stringify(axiosErr.response.data))
         } else if (axiosErr?.request) {
           console.error("Request sent but no response — CORS or network issue")
         } else {
-          console.error("Error before request:", axiosErr?.message)
+          console.error("Error before request:", (err as Error)?.message)
         }
 
         const res = axiosErr?.response
-        const detail = res?.data?.detail
+        const detail = (res?.data as Record<string, unknown>)?.detail
         const msg =
           typeof detail === "string"
             ? detail
