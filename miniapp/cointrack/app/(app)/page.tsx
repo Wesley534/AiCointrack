@@ -10,7 +10,7 @@ import { lightTheme, darkTheme } from "@/lib/constants"
 
 export default function Page() {
   const router = useRouter()
-  const { address, isConnected, chainId } = useAccount()
+  const { address, isConnected, chainId, status } = useAccount()
   const { signMessageAsync } = useSignMessage()
   const { setMiniAppReady } = useMiniKit()
   const { jwt, user, setAuth, logout, theme } = useAppStore()
@@ -20,29 +20,30 @@ export default function Page() {
   const [retryKey, setRetryKey] = useState(0)
   const colors = theme === "light" ? lightTheme : darkTheme
 
-  // Tell Base app the miniapp is ready
   useEffect(() => {
     setMiniAppReady()
   }, [setMiniAppReady])
 
   useEffect(() => {
     if (!hasHydrated) return
+
+    // Wait for wagmi to finish reconnecting before doing anything
+    if (status === "reconnecting" || status === "connecting") return
+
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
 
-    // Already authenticated in store — verify JWT is still valid
+    // Already authenticated — verify JWT still valid
     if (jwt && user) {
       getMe()
-        .then(() => {
-          router.replace("/dashboard")
-        })
+        .then(() => router.replace("/dashboard"))
         .catch(() => {
-          // JWT expired — clear store and re-auth
           logout()
           setLoading(false)
         })
       return
     }
 
+    // Not connected and not in demo
     if (!isConnected || !address) {
       if (isDemo) {
         setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
@@ -53,7 +54,7 @@ export default function Page() {
       return
     }
 
-    // Check localStorage JWT as fallback (handles cases where persist hasn't rehydrated yet)
+    // Check localStorage JWT as fallback
     const existingJwt = typeof window !== "undefined"
       ? localStorage.getItem("pocketpal_jwt")
       : null
@@ -75,22 +76,31 @@ export default function Page() {
 
     async function doAuth() {
       try {
+        console.log("🚀 doAuth starting. address:", address, "chainId:", chainId, "status:", status)
         const token = await authenticateWallet(
           address!,
           chainId || 8453,
           signMessageAsync
         )
+        console.log("✅ Got token, fetching user...")
         const userRes = await getMe()
         setAuth(address!, token, userRes.data)
         router.replace("/dashboard")
       } catch (err: unknown) {
-        console.error("Auth error:", err)
-        const res = err && typeof err === "object" && "response" in err
-          ? (err as { response?: { data?: unknown; status?: number } }).response
-          : null
-        const detail = res?.data && typeof res.data === "object" && "detail" in res.data
-          ? (res.data as { detail: unknown }).detail
-          : null
+        console.error("❌ Auth error:", err)
+
+        const axiosErr = err as any
+        if (axiosErr?.response) {
+          console.error("Response status:", axiosErr.response.status)
+          console.error("Response data:", JSON.stringify(axiosErr.response.data))
+        } else if (axiosErr?.request) {
+          console.error("Request sent but no response — CORS or network issue")
+        } else {
+          console.error("Error before request:", axiosErr?.message)
+        }
+
+        const res = axiosErr?.response
+        const detail = res?.data?.detail
         const msg =
           typeof detail === "string"
             ? detail
@@ -103,7 +113,7 @@ export default function Page() {
         setLoading(false)
       }
     }
-  }, [hasHydrated, isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
+  }, [hasHydrated, status, isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
 
   if (loading) return (
     <div style={{
@@ -141,7 +151,7 @@ export default function Page() {
       minHeight: "100vh",
     }}>
       <div style={{ fontSize: 48, marginBottom: 16 }}>💰</div>
-      <div style={{ fontWeight: 800, fontSize: 24, marginBottom: 8, color: colors.text }}>Cointrack</div>
+      <div style={{ fontWeight: 800, fontSize: 24, marginBottom: 8, color: colors.text }}>AiCoinTrack</div>
       <div style={{ color: colors.muted, fontSize: 15 }}>
         Open this app inside the Base app to connect your wallet automatically.
       </div>
