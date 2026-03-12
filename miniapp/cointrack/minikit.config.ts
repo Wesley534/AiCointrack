@@ -21,10 +21,10 @@ export const minikitConfig = {
   },
   miniapp: {
     version: "1",
-    name: "cointrack",
-    subtitle: "",
-    description: "",
-    screenshotUrls: [],
+    name: "AiCoinTrack",
+    subtitle: "Your financial companion on Base",
+    description: "Track your expenses, manage your budget, and achieve your savings goals with AiCoinTrack, the all-in-one wallet and financial tracker built for Base.",
+    screenshotUrls: `${ROOT_URL}/screenshot.png`,
     iconUrl: `${ROOT_URL}/icon.png`,
     splashImageUrl: `${ROOT_URL}/splash.png`,
     // Match mobile dark background color

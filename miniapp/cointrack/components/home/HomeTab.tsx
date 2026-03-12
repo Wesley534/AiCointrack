@@ -14,7 +14,7 @@ export default function HomeTab() {
 
   return (
     <div>
-      <TopBar title="Cointrack" showAddress />
+      <TopBar title="AiCoinTrack" showAddress />
       <div style={{ paddingTop: 20 }}>
         <WalletCard
           onSend={() => setActiveSheet("send")}

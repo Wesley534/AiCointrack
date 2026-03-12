@@ -58,7 +58,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           navigatorKey: navigatorKey,
-          title: 'CoinTrack',
+          title: 'AiCoinTrack',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

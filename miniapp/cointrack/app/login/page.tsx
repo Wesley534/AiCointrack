@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useAccount, useSignMessage } from "wagmi"
+import Link from "next/link"
+import { useAccount, useConnect, useSignMessage } from "wagmi"
 import { SiweMessage } from "siwe"
-import { ConnectWallet } from "@coinbase/onchainkit/wallet"
 import { getNonce } from "@/lib/api"
 import "@coinbase/onchainkit/styles.css"
 
@@ -25,6 +25,7 @@ type Phase =
 
 export default function LoginPage() {
     const { address, isConnected, chainId } = useAccount()
+    const { connectAsync, connectors } = useConnect()
     const { signMessageAsync } = useSignMessage()
 
     const [phase, setPhase] = useState<Phase>("idle")
@@ -71,7 +72,7 @@ export default function LoginPage() {
             const siweMessage = new SiweMessage({
                 domain: DOMAIN,
                 address,
-                statement: "Sign in to Cointrack",
+                statement: "Sign in to AiCointrack",
                 uri: ORIGIN,
                 version: "1",
                 chainId: effectiveChain,
@@ -115,6 +116,31 @@ export default function LoginPage() {
         }
     }
 
+    async function handleConnectWallet() {
+        try {
+            const preferredConnector =
+                connectors.find((c) => c.id === "farcaster") ??
+                connectors.find((c) => c.id === "coinbaseWalletSDK") ??
+                connectors[0]
+
+            if (!preferredConnector) {
+                throw new Error("No wallet connector available")
+            }
+
+            await connectAsync({
+                connector: preferredConnector,
+                chainId: BASE_CHAIN_ID,
+            })
+        } catch (err) {
+            let msg = "Wallet connection failed. Please try again."
+            if (err instanceof Error && err.message) {
+                msg = err.message
+            }
+            setErrorMsg(msg)
+            setPhase("error")
+        }
+    }
+
     // ── Derived UI state ──────────────────────────────────────────────────────
 
     const isBusy = phase === "signing" || phase === "redirecting"
@@ -135,11 +161,15 @@ export default function LoginPage() {
                     <span style={styles.logoEmoji}>🔵</span>
                 </div>
 
-                <h1 style={styles.heading}>Sign in to CoinTrack</h1>
+                <h1 style={styles.heading}>Sign in to AiCoinTrack (Embed)</h1>
                 <p style={styles.sub}>
-                    Connect your Base smart wallet — secured by passkey,<br />
-                    no seed phrase needed.
+                    For Flutter deep-link auth. Connect your Base smart wallet —<br />
+                    secured by passkey, no seed phrase needed.
                 </p>
+
+                <Link href="/login/miniapp" style={styles.altLoginLink}>
+                    Use Mini App authentication instead
+                </Link>
 
                 {/* Error banner */}
                 {errorMsg && (
@@ -152,7 +182,11 @@ export default function LoginPage() {
                 {/* Wallet button — shown only when not busy */}
                 {!isBusy && (
                     <div style={styles.connectWrap} id="base-connect-button">
-                        <ConnectWallet className="ock-connect-btn">
+                        <button
+                            className="ock-connect-btn"
+                            onClick={handleConnectWallet}
+                            type="button"
+                        >
                             <div style={styles.connectInner}>
                                 <span style={styles.connectIcon}>🔑</span>
                                 <div>
@@ -160,7 +194,7 @@ export default function LoginPage() {
                                     <div style={styles.connectSublabel}>Passkey · no seed phrase</div>
                                 </div>
                             </div>
-                        </ConnectWallet>
+                        </button>
                     </div>
                 )}
 
@@ -332,6 +366,12 @@ const styles: Record<string, React.CSSProperties> = {
         lineHeight: 1.6,
         textAlign: "center",
         margin: "0 0 24px",
+    },
+    altLoginLink: {
+        color: "#8FB0FF",
+        fontSize: 13,
+        textDecoration: "none",
+        margin: "-8px 0 16px",
     },
     errorBanner: {
         width: "100%",
