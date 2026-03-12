@@ -1,19 +1,19 @@
 "use client"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAccount, useSignMessage } from "wagmi"
-import { useMiniKit } from "@coinbase/onchainkit/minikit"
+import { useAuthenticate, useMiniKit } from "@coinbase/onchainkit/minikit"
 import { AxiosError } from "axios"
-import { authenticateWallet } from "@/lib/auth"
-import { getMe } from "@/lib/api"
+import { getMe, miniappLogin } from "@/lib/api"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
 export default function Page() {
   const router = useRouter()
-  const { address, isConnected, chainId, status } = useAccount()
-  const { signMessageAsync } = useSignMessage()
-  const { setMiniAppReady } = useMiniKit()
+  const { setFrameReady, isFrameReady, context } = useMiniKit()
+  const { signIn } = useAuthenticate(
+    typeof window !== "undefined" ? window.location.origin : undefined,
+    false
+  )
   const { jwt, user, setAuth, logout, theme } = useAppStore()
   const hasHydrated = useAppStore(state => state._hasHydrated)
   const [loading, setLoading] = useState(true)
@@ -22,14 +22,13 @@ export default function Page() {
   const colors = theme === "light" ? lightTheme : darkTheme
 
   useEffect(() => {
-    setMiniAppReady()
-  }, [setMiniAppReady])
+    if (!isFrameReady) {
+      setFrameReady()
+    }
+  }, [isFrameReady, setFrameReady])
 
   useEffect(() => {
-    if (!hasHydrated) return
-
-    // Wait for wagmi to finish reconnecting before doing anything
-    if (status === "reconnecting" || status === "connecting") return
+    if (!hasHydrated || !isFrameReady) return
 
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
 
@@ -44,51 +43,45 @@ export default function Page() {
       return
     }
 
-    // Not connected and not in demo
-    if (!isConnected || !address) {
-      if (isDemo) {
-        setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
-        router.replace("/dashboard")
-      } else {
-        setLoading(false)
-      }
+    if (isDemo) {
+      setAuth("fid_demo", "demo-token", {})
+      router.replace("/dashboard")
       return
     }
 
-    // Check localStorage JWT as fallback
-    const existingJwt = typeof window !== "undefined"
-      ? localStorage.getItem("pocketpal_jwt")
-      : null
-
-    if (existingJwt) {
-      getMe()
-        .then(res => {
-          setAuth(address, existingJwt, res.data)
-          router.replace("/dashboard")
-        })
-        .catch(() => {
-          localStorage.removeItem("pocketpal_jwt")
-          logout()
-          doAuth()
-        })
-    } else {
-      doAuth()
-    }
+    doAuth()
 
     async function doAuth() {
       try {
-        console.log("🚀 doAuth starting. address:", address, "chainId:", chainId, "status:", status)
-        const token = await authenticateWallet(
-          address!,
-          chainId || 8453,
-          signMessageAsync
-        )
-        console.log("✅ Got token, fetching user...")
-        const userRes = await getMe()
-        setAuth(address!, token, userRes.data)
+        console.log("🚀 MiniApp auth starting")
+        const authResult = await signIn()
+        if (!authResult) {
+          throw new Error("MiniApp authentication was rejected or unavailable")
+        }
+
+        const fid = context?.user?.fid
+        if (!fid) {
+          throw new Error("Missing verified Farcaster FID from MiniKit context")
+        }
+
+        const authRes = await miniappLogin({
+          fid,
+          username: context?.user?.username,
+          display_name: context?.user?.displayName,
+          pfp_url: context?.user?.pfpUrl,
+        })
+
+        const token = (authRes.data as { jwt?: string })?.jwt
+        const authenticatedUser = (authRes.data as { user?: Record<string, unknown> })?.user
+
+        if (!token || !authenticatedUser) {
+          throw new Error("Invalid auth response from server")
+        }
+
+        setAuth(`fid_${fid}`, token, authenticatedUser)
         router.replace("/dashboard")
       } catch (err: unknown) {
-        console.error("❌ Auth error:", err)
+        console.error("❌ MiniApp auth error:", err)
 
         const axiosErr = err as AxiosError
         if (axiosErr?.response) {
@@ -114,7 +107,7 @@ export default function Page() {
         setLoading(false)
       }
     }
-  }, [hasHydrated, status, isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
+  }, [hasHydrated, isFrameReady, signIn, context, setAuth, logout, retryKey, jwt, user, router])
 
   if (loading) return (
     <div style={{
@@ -141,21 +134,6 @@ export default function Page() {
         💰
       </div>
       <div style={{ fontSize: 14, color: colors.muted }}>Loading Cointrack...</div>
-    </div>
-  )
-
-  if (!isConnected && process.env.NEXT_PUBLIC_DEMO_MODE !== "true") return (
-    <div style={{
-      padding: 32,
-      textAlign: "center",
-      background: theme === "light" ? colors.bg : colors.surface,
-      minHeight: "100vh",
-    }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>💰</div>
-      <div style={{ fontWeight: 800, fontSize: 24, marginBottom: 8, color: colors.text }}>AiCoinTrack</div>
-      <div style={{ color: colors.muted, fontSize: 15 }}>
-        Open this app inside the Base app to connect your wallet automatically.
-      </div>
     </div>
   )
 

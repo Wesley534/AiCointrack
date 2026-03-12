@@ -17,6 +17,8 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     redirect_slashes=False,
+    root_path="/cointrack"
+
 )
 
 # Configure CORS (miniapp, Flutter, local dev)
@@ -25,7 +27,7 @@ app = FastAPI(
 # are not required.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*","https://cointrack-nu.vercel.app"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

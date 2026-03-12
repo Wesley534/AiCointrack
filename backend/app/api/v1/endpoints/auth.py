@@ -63,6 +63,13 @@ class WalletAuthResponse(BaseModel):
     user: dict
 
 
+class MiniAppAuthRequest(BaseModel):
+    fid: int
+    username: Optional[str] = None
+    display_name: Optional[str] = None
+    pfp_url: Optional[str] = None
+
+
 class LinkWalletRequest(BaseModel):
     firebase_token: str  # or id_token from Firebase
     address: str
@@ -358,6 +365,54 @@ async def wallet_login(
         jwt=jwt_token,
         firebase_custom_token=firebase_token,
         user=_user_to_dict(new_user),
+    )
+
+
+@router.post("/miniapp", response_model=WalletAuthResponse)
+async def miniapp_login(
+    req: MiniAppAuthRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    MiniApp auth via verified Farcaster FID.
+    Body: { fid, username?, display_name?, pfp_url? }
+    Returns: { jwt, firebase_custom_token, user }
+    """
+    firebase_uid = f"fid_{req.fid}"
+
+    user = db.query(User).filter(User.firebase_uid == firebase_uid).first()
+
+    if user:
+        if req.display_name:
+            user.display_name = req.display_name
+        if req.pfp_url:
+            user.photo_url = req.pfp_url
+        user.auth_providers = _ensure_auth_provider(user.auth_providers, "farcaster")
+        db.commit()
+        db.refresh(user)
+    else:
+        user = User(
+            firebase_uid=firebase_uid,
+            email=None,
+            hashed_password=None,
+            full_name=None,
+            display_name=req.display_name,
+            photo_url=req.pfp_url,
+            wallet_address=None,
+            wallet_created_by_system=None,
+            privy_user_id=None,
+            wallet_type=None,
+            auth_providers=["farcaster"],
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    jwt_token = create_access_token(subject=str(user.id))
+    return WalletAuthResponse(
+        jwt=jwt_token,
+        firebase_custom_token=None,
+        user=_user_to_dict(user),
     )
 
 

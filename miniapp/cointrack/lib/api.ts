@@ -20,6 +20,13 @@ export const getNonce = async (): Promise<string> => {
 export const walletLogin = (address: string, signature: string, message: string) =>
   api.post("/api/v1/auth/wallet", { address, signature, message })
 
+export const miniappLogin = (data: {
+  fid: number
+  username?: string
+  display_name?: string
+  pfp_url?: string
+}) => api.post("/api/v1/auth/miniapp", data)
+
 export const getMe = () =>
   api.get("/api/v1/auth/me")
 
