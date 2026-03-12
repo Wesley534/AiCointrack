@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useAccount, useSignMessage } from "wagmi"
 import { useMiniKit } from "@coinbase/onchainkit/minikit"
@@ -15,9 +15,11 @@ export default function Page() {
   const { setMiniAppReady } = useMiniKit()
   const { jwt, user, setAuth, logout, theme } = useAppStore()
   const hasHydrated = useAppStore(state => state._hasHydrated)
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [retryKey, setRetryKey] = useState(0)
+  const hasStarted = useRef(false)
   const colors = theme === "light" ? lightTheme : darkTheme
 
   // Tell Base app the miniapp is ready
@@ -25,63 +27,93 @@ export default function Page() {
     setMiniAppReady()
   }, [setMiniAppReady])
 
+  // Connection timeout
+  useEffect(() => {
+    if (isConnected) return;
+    const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+    if (isDemo) return;
+
+    const timer = setTimeout(() => {
+      if (!isConnected) {
+        setError("Could not connect to Base wallet. Please ensure you are opening this app inside the Base app.");
+        setLoading(false);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [isConnected]);
+
   useEffect(() => {
     if (!hasHydrated) return
+
     const isDemo = process.env.NEXT_PUBLIC_DEMO_MODE === "true"
-
-    // Already authenticated in store — verify JWT is still valid
-    if (jwt && user) {
-      getMe()
-        .then(() => {
-          router.replace("/dashboard")
-        })
-        .catch(() => {
-          // JWT expired — clear store and re-auth
-          logout()
-          setLoading(false)
-        })
-      return
-    }
-
     if (!isConnected || !address) {
       if (isDemo) {
         setAuth("0x0000000000000000000000000000000000000000", "demo-token", {})
         router.replace("/dashboard")
-      } else {
-        setLoading(false)
       }
-      return
+      return // wait for MiniKit autoConnect
     }
 
-    // Check localStorage JWT as fallback (handles cases where persist hasn't rehydrated yet)
-    const existingJwt = typeof window !== "undefined"
-      ? localStorage.getItem("pocketpal_jwt")
-      : null
+    if (hasStarted.current) return
+    hasStarted.current = true
 
-    if (existingJwt) {
-      getMe()
-        .then(res => {
-          setAuth(address, existingJwt, res.data)
+    async function authenticate() {
+      // 1. Check in-memory zustand store
+      if (jwt && user) {
+        try {
+          await getMe()
           router.replace("/dashboard")
-        })
-        .catch(() => {
-          localStorage.removeItem("pocketpal_jwt")
+          return
+        } catch {
           logout()
-          doAuth()
-        })
-    } else {
-      doAuth()
-    }
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("pocketpal_jwt")
+            localStorage.removeItem("pocketpal_address")
+          }
+        }
+      }
 
-    async function doAuth() {
+      // 2. Check localStorage fallback (needs address verification)
+      let existingJwt = null
+      let existingAddress = null
+      if (typeof window !== "undefined") {
+        existingJwt = localStorage.getItem("pocketpal_jwt")
+        existingAddress = localStorage.getItem("pocketpal_address")
+      }
+
+      if (existingJwt && existingAddress && existingAddress.toLowerCase() === address?.toLowerCase()) {
+        try {
+          const res = await getMe()
+          setAuth(address!, existingJwt, res.data)
+          router.replace("/dashboard")
+          return
+        } catch {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("pocketpal_jwt")
+            localStorage.removeItem("pocketpal_address")
+          }
+          logout()
+        }
+      } else {
+        if (typeof window !== "undefined" && (existingJwt || existingAddress)) {
+          localStorage.removeItem("pocketpal_jwt")
+          localStorage.removeItem("pocketpal_address")
+        }
+      }
+
+      // 3. Fallback: Full SIWE Auth flow
       try {
         const token = await authenticateWallet(
           address!,
-          chainId || 8453,
+          chainId ?? 8453,
           signMessageAsync
         )
         const userRes = await getMe()
         setAuth(address!, token, userRes.data)
+        if (typeof window !== "undefined") {
+          localStorage.setItem("pocketpal_address", address!)
+        }
         router.replace("/dashboard")
       } catch (err: unknown) {
         console.error("Auth error:", err)
@@ -103,6 +135,9 @@ export default function Page() {
         setLoading(false)
       }
     }
+
+    authenticate()
+
   }, [hasHydrated, isConnected, address, chainId, signMessageAsync, setAuth, logout, retryKey, jwt, user, router])
 
   if (loading) return (
@@ -125,26 +160,19 @@ export default function Page() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: 24
+        fontSize: 24,
+        animation: "pulse 2s infinite"
       }}>
         💰
       </div>
       <div style={{ fontSize: 14, color: colors.muted }}>Loading AiCoinTrack...</div>
-    </div>
-  )
-
-  if (!isConnected && process.env.NEXT_PUBLIC_DEMO_MODE !== "true") return (
-    <div style={{
-      padding: 32,
-      textAlign: "center",
-      background: theme === "light" ? colors.bg : colors.surface,
-      minHeight: "100vh",
-    }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>💰</div>
-      <div style={{ fontWeight: 800, fontSize: 24, marginBottom: 8, color: colors.text }}>AiCoinTrack</div>
-      <div style={{ color: colors.muted, fontSize: 15 }}>
-        Open this app inside the Base app to connect your wallet automatically.
-      </div>
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(0.95); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+      `}} />
     </div>
   )
 
@@ -178,6 +206,7 @@ export default function Page() {
           onClick={() => {
             setError(null)
             setLoading(true)
+            hasStarted.current = false
             setRetryKey(k => k + 1)
           }}
           style={{

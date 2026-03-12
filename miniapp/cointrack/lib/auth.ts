@@ -35,6 +35,7 @@ export async function authenticateWallet(
 
   if (typeof window !== "undefined") {
     localStorage.setItem("pocketpal_jwt", jwt)
+    localStorage.setItem("pocketpal_address", address)
   }
   return jwt
 }

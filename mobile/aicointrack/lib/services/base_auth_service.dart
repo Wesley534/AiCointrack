@@ -32,7 +32,7 @@ class BaseAuthService {
 
   /// Full URL of the miniapp login page.
   static const String _loginUrl =
-      'https://cointrack-nu.vercel.app/login?redirect=$_callbackScheme';
+      'https://cointrack-nu.vercel.app/login/flutter?redirect=$_callbackScheme';
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
