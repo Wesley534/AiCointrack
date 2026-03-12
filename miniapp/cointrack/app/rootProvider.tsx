@@ -2,7 +2,7 @@
 import { ReactNode, useState } from "react";
 import { base } from "wagmi/chains";
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { baseAccount, coinbaseWallet } from "wagmi/connectors";
+import { baseAccount} from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import BottomNav from "@/components/layout/BottomNav";
@@ -15,7 +15,7 @@ const wagmiConfig = createConfig({
   connectors: [
     farcasterMiniApp(),
     baseAccount({
-      appName: "CoinTrack",
+      appName: "AiCoinTrack",
       appLogoUrl: "${ROOT_URL}/icon.png",
     }),
   ],
