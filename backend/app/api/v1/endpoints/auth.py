@@ -4,6 +4,8 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from firebase_admin import auth
@@ -318,10 +320,23 @@ async def wallet_login(
     if not addr.startswith("0x"):
         addr = "0x" + addr
     addr = addr.lower()
+    firebase_uid = f"wallet_{addr}"
 
-    user = db.query(User).filter(User.wallet_address == addr).first()
+    # Check both wallet address and wallet-derived firebase uid.
+    # This prevents duplicate insert attempts during retries/races.
+    user = (
+        db.query(User)
+        .filter(or_(User.wallet_address == addr, User.firebase_uid == firebase_uid))
+        .first()
+    )
 
     if user:
+        if not user.wallet_address:
+            user.wallet_address = addr
+        user.auth_providers = _ensure_auth_provider(user.auth_providers, "wallet")
+        db.commit()
+        db.refresh(user)
+
         jwt_token = create_access_token(subject=str(user.id))
         firebase_token = None
         try:
@@ -335,8 +350,6 @@ async def wallet_login(
             user=_user_to_dict(user),
         )
 
-    firebase_uid = f"wallet_{addr}"
-
     new_user = User(
         firebase_uid=firebase_uid,
         email=None,
@@ -344,7 +357,34 @@ async def wallet_login(
         auth_providers=["wallet"],
     )
     db.add(new_user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Concurrent wallet login can insert the same wallet user in another request.
+        # Recover by loading the existing row and proceeding as login.
+        db.rollback()
+        existing_user = (
+            db.query(User)
+            .filter(or_(User.wallet_address == addr, User.firebase_uid == firebase_uid))
+            .first()
+        )
+        if not existing_user:
+            raise HTTPException(status_code=409, detail="Wallet account already exists")
+
+        jwt_token = create_access_token(subject=str(existing_user.id))
+        firebase_token = None
+        try:
+            if existing_user.firebase_uid:
+                firebase_token = create_custom_token(existing_user.firebase_uid)
+        except ValueError:
+            pass
+
+        return WalletAuthResponse(
+            jwt=jwt_token,
+            firebase_custom_token=firebase_token,
+            user=_user_to_dict(existing_user),
+        )
+
     db.refresh(new_user)
 
     jwt_token = create_access_token(subject=str(new_user.id))
@@ -384,7 +424,10 @@ async def link_wallet(
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
-    addr = req.address if req.address.startswith("0x") else "0x" + req.address
+    addr = req.address.strip()
+    if not addr.startswith("0x"):
+        addr = "0x" + addr
+    addr = addr.lower()
 
     existing_wallet = db.query(User).filter(User.wallet_address == addr).first()
     if existing_wallet and existing_wallet.firebase_uid != firebase_uid:
