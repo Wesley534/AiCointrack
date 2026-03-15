@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
+import '../services/pending_transactions_service.dart';
 import 'budget_page.dart';
+import 'pending_transactions_page.dart';
 import 'transactions_page.dart';
 import 'shopping_pages.dart';
 import 'savings_closeout_pages.dart';
@@ -39,6 +41,13 @@ class _DashboardPageState extends State<DashboardPage> {
   List<dynamic> _recentTransactions = [];
   List<dynamic> _shoppingLists = [];
   List<dynamic> _savingsGoals = [];
+
+  void _setNavIndex(int index) {
+    if (!mounted) return;
+    setState(() {
+      _currentNavIndex = index;
+    });
+  }
 
   @override
   void initState() {
@@ -253,6 +262,9 @@ class _DashboardPageState extends State<DashboardPage> {
       case 4:
         body = const SavingsPage();
         break;
+      case 5:
+        body = const PendingTransactionsPage();
+        break;
       default:
         body = _buildDashboardBody(
           bgColor: bgColor,
@@ -298,43 +310,43 @@ class _DashboardPageState extends State<DashboardPage> {
         elevation: 0,
         actions: [
           // Notifications icon with badge
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {
-                  // TODO: Implement notifications page
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Notifications coming soon')),
-                  );
-                },
-              ),
-              // Notification badge
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger,
-                    shape: BoxShape.circle,
+          ValueListenableBuilder<int>(
+            valueListenable: pendingCountNotifier,
+            builder: (context, count, child) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: () => _setNavIndex(5),
                   ),
-                  constraints: const BoxConstraints(
-                    minWidth: 16,
-                    minHeight: 16,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                  if (count > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           // Search icon
           IconButton(
@@ -692,6 +704,7 @@ class _DashboardPageState extends State<DashboardPage> {
       {'icon': '💸', 'label': 'Transactions', 'id': 2},
       {'icon': '🛒', 'label': 'Shopping', 'id': 3},
       {'icon': '🎯', 'label': 'Savings', 'id': 4},
+      {'icon': '🔔', 'label': 'Review', 'id': 5},
     ];
 
     return Container(
@@ -700,40 +713,67 @@ class _DashboardPageState extends State<DashboardPage> {
         color: cardColor,
       ),
       padding: EdgeInsets.only(bottom: 20, top: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: navItems
-            .map(
-              (item) => GestureDetector(
-                onTap: () {
-                  if (mounted) {
-                    setState(() {
-                      _currentNavIndex = item['id'] as int;
-                    });
-                  }
-                },
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      item['icon'].toString(),
-                      style: TextStyle(fontSize: 18),
+      child: ValueListenableBuilder<int>(
+        valueListenable: pendingCountNotifier,
+        builder: (context, pendingCount, child) {
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: navItems
+                .map(
+                  (item) => GestureDetector(
+                    onTap: () => _setNavIndex(item['id'] as int),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Text(
+                              item['icon'].toString(),
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                            if (item['id'] == 5 && pendingCount > 0)
+                              Positioned(
+                                right: -8,
+                                top: -6,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.danger,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    pendingCount > 9 ? '9+' : '$pendingCount',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item['label'].toString(),
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: _currentNavIndex == item['id']
+                                ? AppColors.accentGreen
+                                : mutedColor,
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 3),
-                    Text(
-                      item['label'].toString(),
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: _currentNavIndex == item['id']
-                            ? AppColors.accentGreen
-                            : mutedColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-            .toList(),
+                  ),
+                )
+                .toList(),
+          );
+        },
       ),
     );
   }
