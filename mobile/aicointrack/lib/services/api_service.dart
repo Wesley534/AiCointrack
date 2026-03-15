@@ -206,16 +206,391 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, String>> _authHeaders() async {
+    var token = await TokenService.getJwt();
+    if (token == null) {
+      token = await AuthService.getIdToken();
+    }
+    if (token == null) {
+      throw Exception('No user signed in');
+    }
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  static dynamic _decodeBody(String body) {
+    if (body.isEmpty) return null;
+    return jsonDecode(body);
+  }
+
+  static Exception _buildApiException(http.Response response) {
+    try {
+      final decoded = _decodeBody(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'] ?? decoded['message'] ?? response.body;
+        return Exception(detail.toString());
+      }
+    } catch (_) {}
+    return Exception(
+      'Request failed: ${response.statusCode} - ${response.body}',
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchTransactions({
+    int limit = 50,
+    String? source,
+    String? transactionType,
+  }) async {
+    final headers = await _authHeaders();
+    final query = <String, String>{
+      'limit': '$limit',
+      if (source != null && source.isNotEmpty) 'source': source,
+      if (transactionType != null && transactionType.isNotEmpty)
+        'transaction_type': transactionType,
+    };
+
+    final uri = Uri.parse(
+      '$baseUrl/api/v1/transactions/',
+    ).replace(queryParameters: query);
+    final response = await http
+        .get(uri, headers: headers)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+
+    final decoded = _decodeBody(response.body);
+    final list = decoded is Map<String, dynamic>
+        ? (decoded['transactions'] as List<dynamic>? ?? <dynamic>[])
+        : (decoded as List<dynamic>? ?? <dynamic>[]);
+    return list
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>> recordOffchainTransaction({
+    required String description,
+    required double amount,
+    required String source,
+    required String transactionType,
+    required String category,
+    String currency = 'KES',
+    String? referenceNumber,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/transactions/offchain'),
+          headers: headers,
+          body: jsonEncode({
+            'description': description,
+            'amount': amount,
+            'source': source,
+            'transaction_type': transactionType,
+            'category': category,
+            'currency': currency,
+            if (referenceNumber != null && referenceNumber.isNotEmpty)
+              'reference_number': referenceNumber,
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCurrentBudget() async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/v1/budgets/current'), headers: headers)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+
+    final decoded = _decodeBody(response.body) as List<dynamic>;
+    return decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>> createBudget({
+    required String label,
+    required double planned,
+    required String tag,
+    required String kind,
+    required String month,
+    double actual = 0.0,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/budgets'),
+          headers: headers,
+          body: jsonEncode({
+            'label': label,
+            'planned': planned,
+            'actual': actual,
+            'tag': tag,
+            'kind': kind,
+            'month': month,
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> updateBudget(
+    int id, {
+    String? label,
+    double? planned,
+    double? actual,
+    String? tag,
+    String? kind,
+    String? month,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .put(
+          Uri.parse('$baseUrl/api/v1/budgets/$id'),
+          headers: headers,
+          body: jsonEncode({
+            if (label != null) 'label': label,
+            if (planned != null) 'planned': planned,
+            if (actual != null) 'actual': actual,
+            if (tag != null) 'tag': tag,
+            if (kind != null) 'kind': kind,
+            if (month != null) 'month': month,
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchShoppingListsFromApi() async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/v1/shopping-lists'), headers: headers)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+
+    final decoded = _decodeBody(response.body) as List<dynamic>;
+    return decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>> createShoppingList({
+    required String name,
+    required double budget,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/shopping-lists'),
+          headers: headers,
+          body: jsonEncode({'name': name, 'budget': budget, 'status': 'green'}),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> fetchShoppingListDetail(
+    int listId,
+  ) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/api/v1/shopping-lists/$listId'),
+          headers: headers,
+        )
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> addShoppingItem(
+    int listId, {
+    required String name,
+    required int qty,
+    required double price,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/shopping-lists/$listId/items'),
+          headers: headers,
+          body: jsonEncode({'name': name, 'qty': qty, 'price': price}),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchSavingsGoalsFromApi() async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/v1/savings-goals'), headers: headers)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+
+    final decoded = _decodeBody(response.body) as List<dynamic>;
+    return decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+  }
+
+  static Future<Map<String, dynamic>> createSavingsGoal(
+    String name,
+    double target,
+    double monthly,
+  ) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/savings-goals'),
+          headers: headers,
+          body: jsonEncode({
+            'name': name,
+            'saved': 0.0,
+            'target': target,
+            'monthly': monthly,
+          }),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> contributeToSavingsGoal(
+    int goalId, {
+    required double amountUsdc,
+    required String txHash,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/api/v1/savings-goals/$goalId/contribute'),
+          headers: headers,
+          body: jsonEncode({'amount_usdc': amountUsdc, 'tx_hash': txHash}),
+        )
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> fetchDashboardSummaryFromApi() async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/v1/dashboard/summary'), headers: headers)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> fetchWalletBalance() async {
+    final headers = await _authHeaders();
+    final response = await http
+        .get(Uri.parse('$baseUrl/api/v1/wallet/balance'), headers: headers)
+        .timeout(
+          const Duration(seconds: 10),
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
   // ─── PLACEHOLDER API HELPERS FOR EACH PAGE ─────────────────────────────────
 
   /// Dashboard placeholder response.
   static Future<Map<String, dynamic>> fetchDashboardSummary() async {
     await Future.delayed(const Duration(milliseconds: 200));
-    return {
-      'freeToSpend': 24500,
-      'variance': 2300,
-      'monthProgress': 0.26,
-    };
+    return {'freeToSpend': 24500, 'variance': 2300, 'monthProgress': 0.26};
   }
 
   /// Budget overview placeholder response.
@@ -236,7 +611,7 @@ class ApiService {
   }
 
   /// Transactions placeholder response.
-  static Future<List<TransactionExample>> fetchTransactions() async {
+  static Future<List<TransactionExample>> fetchTransactionsExample() async {
     await Future.delayed(const Duration(milliseconds: 200));
     return exampleTransactions;
   }
@@ -368,17 +743,17 @@ class ApiService {
 
   static final ShoppingDetailExample exampleShoppingDetail =
       ShoppingDetailExample(
-    title: 'Weekly Groceries',
-    total: 1820,
-    remaining: 2180,
-    items: [
-      ShoppingItemExample(name: 'Rice 5kg', qty: 1, price: 500),
-      ShoppingItemExample(name: 'Milk x6', qty: 2, price: 200),
-      ShoppingItemExample(name: 'Bread', qty: 1, price: 120),
-      ShoppingItemExample(name: 'Chicken', qty: 1, price: 650),
-      ShoppingItemExample(name: 'Tomatoes 1kg', qty: 2, price: 150),
-    ],
-  );
+        title: 'Weekly Groceries',
+        total: 1820,
+        remaining: 2180,
+        items: [
+          ShoppingItemExample(name: 'Rice 5kg', qty: 1, price: 500),
+          ShoppingItemExample(name: 'Milk x6', qty: 2, price: 200),
+          ShoppingItemExample(name: 'Bread', qty: 1, price: 120),
+          ShoppingItemExample(name: 'Chicken', qty: 1, price: 650),
+          ShoppingItemExample(name: 'Tomatoes 1kg', qty: 2, price: 150),
+        ],
+      );
 
   static final List<SavingsGoalExample> exampleSavingsGoals = [
     SavingsGoalExample(
@@ -403,18 +778,34 @@ class ApiService {
 
   static final CloseoutSummaryExample exampleCloseoutSummary =
       CloseoutSummaryExample(
-    metrics: [
-      CloseoutMetric(label: 'Income', value: 'Ksh 85,000', color: AppColors.accentGreen),
-      CloseoutMetric(label: 'Expenses', value: 'Ksh 67,200', color: AppColors.danger),
-      CloseoutMetric(label: 'Saved', value: 'Ksh 12,800', color: AppColors.accentGreen),
-      CloseoutMetric(label: 'Surplus', value: 'Ksh 5,000', color: AppColors.warning),
-    ],
-    categoryDiffs: const [
-      CloseoutCategoryDelta(label: '🍔 Food', delta: '-Ksh 3,600'),
-      CloseoutCategoryDelta(label: '🏠 Rent', delta: 'Ksh 0'),
-      CloseoutCategoryDelta(label: '🚗 Transport', delta: '+Ksh 2,800'),
-    ],
-  );
+        metrics: [
+          CloseoutMetric(
+            label: 'Income',
+            value: 'Ksh 85,000',
+            color: AppColors.accentGreen,
+          ),
+          CloseoutMetric(
+            label: 'Expenses',
+            value: 'Ksh 67,200',
+            color: AppColors.danger,
+          ),
+          CloseoutMetric(
+            label: 'Saved',
+            value: 'Ksh 12,800',
+            color: AppColors.accentGreen,
+          ),
+          CloseoutMetric(
+            label: 'Surplus',
+            value: 'Ksh 5,000',
+            color: AppColors.warning,
+          ),
+        ],
+        categoryDiffs: const [
+          CloseoutCategoryDelta(label: '🍔 Food', delta: '-Ksh 3,600'),
+          CloseoutCategoryDelta(label: '🏠 Rent', delta: 'Ksh 0'),
+          CloseoutCategoryDelta(label: '🚗 Transport', delta: '+Ksh 2,800'),
+        ],
+      );
 
   static final SettingsExample exampleSettings = SettingsExample(
     userName: 'John Kamau',
@@ -525,10 +916,7 @@ class CloseoutSummaryExample {
   final List<CloseoutMetric> metrics;
   final List<CloseoutCategoryDelta> categoryDiffs;
 
-  CloseoutSummaryExample({
-    required this.metrics,
-    required this.categoryDiffs,
-  });
+  CloseoutSummaryExample({required this.metrics, required this.categoryDiffs});
 }
 
 class CloseoutMetric {
@@ -547,10 +935,7 @@ class CloseoutCategoryDelta {
   final String label;
   final String delta;
 
-  const CloseoutCategoryDelta({
-    required this.label,
-    required this.delta,
-  });
+  const CloseoutCategoryDelta({required this.label, required this.delta});
 }
 
 class SettingsExample {
@@ -571,9 +956,5 @@ class SettingsToggle {
   final String label;
   final bool enabled;
 
-  const SettingsToggle({
-    required this.label,
-    required this.enabled,
-  });
+  const SettingsToggle({required this.label, required this.enabled});
 }
-
