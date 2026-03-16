@@ -44,6 +44,7 @@ class BaseAuthService {
   /// a specific message.
   static Future<bool> loginWithBase(BuildContext context) async {
     try {
+      debugPrint('BaseAuth: loginWithBase start -> opening $_loginUrl');
       // ── 1. Open the miniapp /login page ─────────────────────────────────────
       final resultUrl = await FlutterWebAuth2.authenticate(
         url: _loginUrl,
@@ -61,6 +62,7 @@ class BaseAuthService {
       // ── 2. Parse the callback URL ────────────────────────────────────────────
       // Expected: aicointrack://login?address=0x…&message=…&signature=0x…
       final uri = Uri.parse(resultUrl);
+      debugPrint('BaseAuth: callback uri received path=${uri.path} host=${uri.host}');
 
       final address = uri.queryParameters['address'];
       // The miniapp URL-encodes the message via URLSearchParams; Uri.parse
@@ -91,7 +93,7 @@ class BaseAuthService {
         );
       }
       await TokenService.saveJwt(jwt);
-      debugPrint('✓ BaseAuth: JWT stored');
+      debugPrint('✓ BaseAuth: JWT stored (length=${jwt.length})');
 
       // ── 5. Optionally sign into Firebase ─────────────────────────────────────
       final firebaseToken = data['firebase_custom_token'] as String?;
@@ -102,17 +104,23 @@ class BaseAuthService {
         } catch (e) {
           debugPrint('BaseAuth: Firebase custom-token sign-in skipped: $e');
         }
+      } else {
+        debugPrint('BaseAuth: no firebase_custom_token returned (JWT-only session)');
       }
 
       // ── 6. Force navigation regardless of stream timing ──────────────────────
       final ctx = navigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
+        debugPrint('BaseAuth: forcing navigation to HomePage using navigatorKey');
         navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
+      } else {
+        debugPrint('BaseAuth: navigatorKey context unavailable; relying on auth stream/FutureBuilder');
       }
 
+      debugPrint('BaseAuth: loginWithBase success');
       return true;
     } on PlatformException catch (e) {
       // flutter_web_auth_2 throws PlatformException(code: 'CANCELED') when the

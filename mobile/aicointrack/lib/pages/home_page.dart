@@ -18,6 +18,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _logTag = '[HomePage]';
+
   late User? _user;
   bool _isLoading = true;
   bool _hasError = false;
@@ -26,21 +28,29 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _user = AuthService.getCurrentUser();
+    debugPrint('$_logTag initState firebaseUser=${_user?.uid}');
     _registerUserWithBackend();
   }
 
   /// Register or fetch user: Firebase path or JWT path (wallet-only).
   Future<void> _registerUserWithBackend() async {
     try {
+      debugPrint('$_logTag register start');
       final firebaseToken = await AuthService.getIdToken();
       final jwt = await TokenService.getJwt();
+      debugPrint(
+        '$_logTag token availability firebaseToken=${firebaseToken != null} jwt=${jwt != null && jwt.isNotEmpty}',
+      );
 
       Map<String, dynamic> backendResponse;
       if (firebaseToken != null) {
+        debugPrint('$_logTag calling registerUserWithBackend()');
         backendResponse = await ApiService.registerUserWithBackend();
       } else if (jwt != null && jwt.isNotEmpty) {
+        debugPrint('$_logTag calling fetchUserProfile()');
         backendResponse = await ApiService.fetchUserProfile();
       } else {
+        debugPrint('$_logTag no token available -> aborting register flow');
         return;
       }
 
@@ -55,6 +65,7 @@ class _HomePageState extends State<HomePage> {
             userData is Map &&
             userData['wallet_address'] != null &&
             (userData['wallet_address'] as String).isNotEmpty;
+        debugPrint('$_logTag backend success hasWallet=$hasWallet');
 
         final displayName =
             _user?.displayName ??
@@ -66,6 +77,7 @@ class _HomePageState extends State<HomePage> {
             '';
 
         if (!hasWallet) {
+          debugPrint('$_logTag navigating to WalletOptionsPage');
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => WalletOptionsPage(
@@ -78,6 +90,7 @@ class _HomePageState extends State<HomePage> {
             (route) => false,
           );
         } else {
+          debugPrint('$_logTag navigating to DashboardPage');
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => DashboardPage(
@@ -92,6 +105,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
     } catch (e) {
+      debugPrint('$_logTag register error: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
@@ -42,6 +44,41 @@ void main() async {
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+class _NavLogObserver extends NavigatorObserver {
+  void _log(String action, Route<dynamic>? route, Route<dynamic>? previousRoute) {
+    final toName = route?.settings.name ?? route?.runtimeType.toString() ?? 'null';
+    final fromName =
+        previousRoute?.settings.name ??
+        previousRoute?.runtimeType.toString() ??
+        'null';
+    debugPrint('[Nav] $action to=$toName from=$fromName');
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _log('didPush', route, previousRoute);
+    super.didPush(route, previousRoute);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _log('didPop', route, previousRoute);
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _log('didReplace', newRoute, oldRoute);
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _log('didRemove', route, previousRoute);
+    super.didRemove(route, previousRoute);
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -51,6 +88,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           navigatorKey: navigatorKey,
+          navigatorObservers: [_NavLogObserver()],
           title: 'CoinTrack',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
@@ -73,34 +111,67 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   static const _permShownKey = 'notif_perm_shown';
   final Set<int> _seenHashes = <int>{};
+  StreamSubscription<bool>? _authSub;
+  bool? _isAuthenticated;
+  String? _lastRenderedState;
 
   @override
   void initState() {
     super.initState();
-    _listenToAuth();
+    debugPrint('[AuthGate] initState');
+    unawaited(_initAuthGate());
     _initNotificationListener();
     PendingTxService.syncOnStartup();
   }
 
-  void _listenToAuth() {
-    AuthService.appAuthStateChanges().listen((isAuth) async {
+  Future<void> _initAuthGate() async {
+    final jwt = await TokenService.getJwt();
+    final hasJwt = jwt != null && jwt.isNotEmpty;
+    final hasFirebaseUser = AuthService.isUserSignedIn();
+    final initialAuth = hasJwt || hasFirebaseUser;
+
+    debugPrint(
+      '[AuthGate] Initial auth resolved hasJwt=$hasJwt hasFirebaseUser=$hasFirebaseUser -> isAuth=$initialAuth',
+    );
+
+    if (mounted) {
+      setState(() {
+        _isAuthenticated = initialAuth;
+      });
+    }
+
+    if (initialAuth) {
+      unawaited(_maybeShowPermissionScreen());
+    }
+
+    debugPrint('[AuthGate] Subscribing to appAuthStateChanges');
+    _authSub = AuthService.appAuthStateChanges().listen((isAuth) async {
+      debugPrint('[AuthGate] appAuthStateChanges emitted isAuth=$isAuth');
       if (!mounted) return;
-      final current = navigatorKey.currentState;
-      if (current == null) return;
+
+      final previous = _isAuthenticated;
+      if (previous != isAuth) {
+        debugPrint('[AuthGate] UI auth state transition $previous -> $isAuth');
+      }
+
+      setState(() {
+        _isAuthenticated = isAuth;
+      });
 
       if (isAuth) {
-        current.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
         await _maybeShowPermissionScreen();
-      } else {
-        current.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-          (route) => false,
-        );
       }
+    }, onError: (Object e, StackTrace st) {
+      debugPrint('[AuthGate] appAuthStateChanges error: $e');
+    }, onDone: () {
+      debugPrint('[AuthGate] appAuthStateChanges stream done');
     });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _maybeShowPermissionScreen() async {
@@ -108,6 +179,7 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) return;
 
     final granted = await NotificationTransactionService.isAccessGranted();
+    debugPrint('[AuthGate] Notification permission granted=$granted');
     if (granted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -152,28 +224,35 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    // Show splash while auth resolves
-    return FutureBuilder<String?>(
-      future: TokenService.getJwt(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            backgroundColor: AppTheme.darkTheme.scaffoldBackgroundColor,
-            body: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.accentGreen,
-                ),
-              ),
+    if (_isAuthenticated == null) {
+      if (_lastRenderedState != 'splash') {
+        _lastRenderedState = 'splash';
+        debugPrint('[AuthGate] Rendering splash (auth unresolved)');
+      }
+      return Scaffold(
+        backgroundColor: AppTheme.darkTheme.scaffoldBackgroundColor,
+        body: Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(
+              AppColors.accentGreen,
             ),
-          );
-        }
-        // JWT exists → go straight to app
-        if (snapshot.data != null && snapshot.data!.isNotEmpty) {
-          return const HomePage();
-        }
-        return const LoginPage();
-      },
-    );
+          ),
+        ),
+      );
+    }
+
+    if (_isAuthenticated == true) {
+      if (_lastRenderedState != 'home') {
+        _lastRenderedState = 'home';
+        debugPrint('[AuthGate] Rendering HomePage');
+      }
+      return const HomePage();
+    }
+
+    if (_lastRenderedState != 'login') {
+      _lastRenderedState = 'login';
+      debugPrint('[AuthGate] Rendering LoginPage');
+    }
+    return const LoginPage();
   }
 }

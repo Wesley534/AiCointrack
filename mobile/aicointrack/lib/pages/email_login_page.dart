@@ -4,7 +4,6 @@ import '../services/auth_service.dart';
 import '../firebase_options.dart';
 import '../config/theme.dart';
 import 'home_page.dart';
-import 'login_page.dart';
 
 /// Email/password sign-in and sign-up page.
 class EmailLoginPage extends StatefulWidget {
@@ -17,6 +16,8 @@ class EmailLoginPage extends StatefulWidget {
 }
 
 class _EmailLoginPageState extends State<EmailLoginPage> {
+  static const _logTag = '[EmailLoginPage]';
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -29,6 +30,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
   void initState() {
     super.initState();
     _isSignUp = widget.isSignUp;
+    debugPrint('$_logTag initState isSignUp=$_isSignUp');
   }
 
   @override
@@ -40,6 +42,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
   }
 
   Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    debugPrint('$_logTag submit start mode=${_isSignUp ? 'signUp' : 'signIn'} email=$email');
     setState(() {
       _errorMessage = null;
       _isLoading = true;
@@ -52,26 +56,30 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
 
       if (_isSignUp) {
         await AuthService.createUserWithEmail(
-          email: _emailController.text.trim(),
+          email: email,
           password: _passwordController.text,
           displayName: _nameController.text.trim().isNotEmpty
               ? _nameController.text.trim()
               : null,
         );
+        debugPrint('$_logTag createUserWithEmail success');
       } else {
         await AuthService.signInWithEmail(
-          email: _emailController.text.trim(),
+          email: email,
           password: _passwordController.text,
         );
+        debugPrint('$_logTag signInWithEmail success');
       }
 
       if (mounted) {
+        debugPrint('$_logTag navigating to HomePage via pushAndRemoveUntil');
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const HomePage()),
           (route) => false,
         );
       }
     } on FirebaseAuthException catch (e) {
+      debugPrint('$_logTag FirebaseAuthException code=${e.code} message=${e.message}');
       if (mounted) {
         setState(() {
           _errorMessage = _getAuthErrorMessage(e.code);
@@ -79,6 +87,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
         });
       }
     } catch (e) {
+      debugPrint('$_logTag submit error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = e.toString().replaceFirst('Exception: ', '');
@@ -111,7 +120,6 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
     final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
     final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -260,6 +268,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   onPressed: _isLoading
                       ? null
                       : () {
+                          debugPrint('$_logTag toggling mode from ${_isSignUp ? 'signUp' : 'signIn'}');
                           setState(() {
                             _isSignUp = !_isSignUp;
                             _errorMessage = null;
