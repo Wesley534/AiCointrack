@@ -93,9 +93,8 @@ export default function LoginPage() {
             })
             const callbackUrl = `${callbackScheme}://login?${params.toString()}`
 
-            // Small delay so the user sees the "redirecting" state briefly
-            await new Promise(r => setTimeout(r, 600))
-            window.location.href = callbackUrl
+            // Redirect immediately to hand control back to the app
+            window.location.replace(callbackUrl)
         } catch (err: unknown) {
             console.error("Login signing error:", err)
 

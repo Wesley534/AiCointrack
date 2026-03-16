@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../main.dart' show navigatorKey;
 import 'dashboard_page.dart';
 
 /// Shown after registration when user has no wallet.
@@ -28,7 +29,7 @@ class _WalletOptionsPageState extends State<WalletOptionsPage> {
 
   void goToDashboard([Map<String, dynamic>? updatedUserData]) {
     final userData = updatedUserData ?? widget.userData;
-    Navigator.of(context).pushAndRemoveUntil(
+    navigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (context) => DashboardPage(
           userName: widget.userName,

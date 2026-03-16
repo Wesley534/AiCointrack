@@ -51,7 +51,8 @@ class _NavLogObserver extends NavigatorObserver {
         previousRoute?.settings.name ??
         previousRoute?.runtimeType.toString() ??
         'null';
-    debugPrint('[Nav] $action to=$toName from=$fromName');
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    debugPrint('[Nav][$ts] $action to=$toName from=$fromName');
   }
 
   @override
@@ -108,7 +109,7 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   static const _permShownKey = 'notif_perm_shown';
   final Set<int> _seenHashes = <int>{};
   StreamSubscription<bool>? _authSub;
@@ -118,10 +119,16 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     debugPrint('[AuthGate] initState');
     unawaited(_initAuthGate());
     _initNotificationListener();
     PendingTxService.syncOnStartup();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('[AuthGate] lifecycle=$state isAuth=$_isAuthenticated');
   }
 
   Future<void> _initAuthGate() async {
@@ -170,6 +177,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
     super.dispose();
   }

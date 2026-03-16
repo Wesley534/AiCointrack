@@ -5,8 +5,6 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 import 'token_service.dart';
-import '../main.dart' show navigatorKey;
-import '../pages/home_page.dart';
 
 /// Handles "Sign in with Base" using the miniapp /login page.
 ///
@@ -45,6 +43,10 @@ class BaseAuthService {
   static Future<bool> loginWithBase(BuildContext context) async {
     try {
       debugPrint('BaseAuth: loginWithBase start -> opening $_loginUrl');
+      debugPrint('BaseAuth: calling FlutterWebAuth2.authenticate');
+      debugPrint(
+        'BaseAuth: preferEphemeral=false intentFlags=ephemeralIntentFlags',
+      );
       // ── 1. Open the miniapp /login page ─────────────────────────────────────
       final resultUrl = await FlutterWebAuth2.authenticate(
         url: _loginUrl,
@@ -52,12 +54,13 @@ class BaseAuthService {
         options: const FlutterWebAuth2Options(
           // Keep the browser session alive so the passkey/Face-ID flow works.
           preferEphemeral: false,
-          // Do NOT use ephemeralIntentFlags — on some Android OEMs (Infinix,
-          // Tecno, etc.) FLAG_ACTIVITY_NO_HISTORY prevents the Custom Tab
-          // from properly forwarding the aicointrack:// redirect to the
-          // CallbackActivity, causing the WebView to hang instead of dismissing.
+          // Mark this as a one-shot auth tab so Android closes it once the
+          // custom-scheme redirect is intercepted by CallbackActivity.
+          intentFlags: ephemeralIntentFlags,
         ),
       );
+      debugPrint('BaseAuth: authenticate() returned — Custom Tab is closed');
+      debugPrint('BaseAuth: resultUrl=$resultUrl');
 
       // ── 2. Parse the callback URL ────────────────────────────────────────────
       // Expected: aicointrack://login?address=0x…&message=…&signature=0x…
@@ -106,18 +109,6 @@ class BaseAuthService {
         }
       } else {
         debugPrint('BaseAuth: no firebase_custom_token returned (JWT-only session)');
-      }
-
-      // ── 6. Force navigation regardless of stream timing ──────────────────────
-      final ctx = navigatorKey.currentContext;
-      if (ctx != null && ctx.mounted) {
-        debugPrint('BaseAuth: forcing navigation to HomePage using navigatorKey');
-        navigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false,
-        );
-      } else {
-        debugPrint('BaseAuth: navigatorKey context unavailable; relying on auth stream/FutureBuilder');
       }
 
       debugPrint('BaseAuth: loginWithBase success');

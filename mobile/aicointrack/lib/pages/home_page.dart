@@ -19,6 +19,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const _logTag = '[HomePage]';
+  static bool _registrationInProgress = false;
 
   late User? _user;
   bool _isLoading = true;
@@ -29,7 +30,19 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _user = AuthService.getCurrentUser();
     debugPrint('$_logTag initState firebaseUser=${_user?.uid}');
+
+    if (_registrationInProgress) {
+      debugPrint('$_logTag registration already in progress, skipping duplicate');
+      return;
+    }
+    _registrationInProgress = true;
     _registerUserWithBackend();
+  }
+
+  @override
+  void dispose() {
+    _registrationInProgress = false;
+    super.dispose();
   }
 
   /// Register or fetch user: Firebase path or JWT path (wallet-only).
@@ -51,6 +64,7 @@ class _HomePageState extends State<HomePage> {
         backendResponse = await ApiService.fetchUserProfile();
       } else {
         debugPrint('$_logTag no token available -> aborting register flow');
+        _registrationInProgress = false;
         return;
       }
 
@@ -106,6 +120,7 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint('$_logTag register error: $e');
+      _registrationInProgress = false;
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -128,6 +143,7 @@ class _HomePageState extends State<HomePage> {
       _isLoading = true;
       _hasError = false;
     });
+    _registrationInProgress = true;
     await _registerUserWithBackend();
   }
 
