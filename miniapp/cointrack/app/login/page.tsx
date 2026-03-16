@@ -93,8 +93,8 @@ export default function LoginPage() {
             })
             const callbackUrl = `${callbackScheme}://login?${params.toString()}`
 
-            // Redirect immediately to hand control back to the app
-            window.location.replace(callbackUrl)
+            // Use href for better callback delivery on some Android OEM builds
+            window.location.href = callbackUrl
         } catch (err: unknown) {
             console.error("Login signing error:", err)
 

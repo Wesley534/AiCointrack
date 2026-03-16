@@ -44,19 +44,13 @@ class BaseAuthService {
     try {
       debugPrint('BaseAuth: loginWithBase start -> opening $_loginUrl');
       debugPrint('BaseAuth: calling FlutterWebAuth2.authenticate');
-      debugPrint(
-        'BaseAuth: preferEphemeral=false intentFlags=ephemeralIntentFlags',
-      );
+      debugPrint('BaseAuth: preferEphemeral=true intentFlags=none');
       // ── 1. Open the miniapp /login page ─────────────────────────────────────
       final resultUrl = await FlutterWebAuth2.authenticate(
         url: _loginUrl,
         callbackUrlScheme: _callbackScheme,
         options: const FlutterWebAuth2Options(
-          // Keep the browser session alive so the passkey/Face-ID flow works.
-          preferEphemeral: false,
-          // Mark this as a one-shot auth tab so Android closes it once the
-          // custom-scheme redirect is intercepted by CallbackActivity.
-          intentFlags: ephemeralIntentFlags,
+          preferEphemeral: true,
         ),
       );
       debugPrint('BaseAuth: authenticate() returned — Custom Tab is closed');

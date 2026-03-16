@@ -387,7 +387,7 @@ class _Header extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         Text(
-          'CoinTrack',
+          'AiCoinTrack',
           style: TextStyle(
             fontSize: 30,
             fontWeight: FontWeight.w800,
