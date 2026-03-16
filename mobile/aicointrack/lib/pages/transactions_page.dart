@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/pending_transactions_service.dart';
 import '../utils/formatters.dart';
 import 'add_transaction_sheet.dart';
+import 'pending_transactions_page.dart';
 
 /// Transactions list page – shows recent transactions with filters.
 class TransactionsPage extends StatefulWidget {
@@ -109,7 +111,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
     final type = (item['transaction_type'] ?? 'expense')
         .toString()
         .toLowerCase();
-    return '${type == 'income' ? '+' : '-'}${amount.toStringAsFixed(0)}';
+    return '${type == 'income' ? '+' : '-'}${Formatters.formatKes(amount)}';
   }
 
   String _displaySource(String source) {
@@ -122,7 +124,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+            valueColor: AlwaysStoppedAnimation(AppColors.accent),
           ),
           const SizedBox(height: 12),
           Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
@@ -199,7 +201,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
               OutlinedButton(
                 onPressed: _openAddSheet,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.accentGreen,
+                  foregroundColor: AppColors.accent,
                   side: BorderSide(color: borderColor),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
@@ -242,6 +244,57 @@ class _TransactionsPageState extends State<TransactionsPage> {
             ),
           ),
           const SizedBox(height: 12),
+          ValueListenableBuilder<int>(
+            valueListenable: pendingCountNotifier,
+            builder: (context, pendingCount, _) {
+              if (pendingCount <= 0) return const SizedBox.shrink();
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.danger.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.pending_actions_outlined,
+                      color: AppColors.danger,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '$pendingCount transaction${pendingCount == 1 ? '' : 's'} pending review',
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PendingTransactionsPage(),
+                        ),
+                      ),
+                      child: const Text(
+                        'Review →',
+                        style: TextStyle(color: AppColors.danger, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
           if (_data.isEmpty) _buildEmpty(mutedColor),
           ..._data.map((raw) {
             final item = Map<String, dynamic>.from(raw as Map);
@@ -301,7 +354,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
                                     if (displaySource == 'chain')
                                       const _SourcePill(
                                         text: 'Onchain',
-                                        color: AppColors.accentGreen,
+                                        color: AppColors.accent,
                                       ),
                                     if (displaySource == 'cash')
                                       const _SourcePill(text: 'Manual'),
@@ -318,12 +371,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
                       ),
                     ),
                     Text(
-                      'Ksh $amount',
+                      amount,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: isPositive
-                            ? AppColors.accentGreen
+                            ? AppColors.positive
                             : AppColors.danger,
                       ),
                     ),
@@ -382,10 +435,8 @@ class _FilterChip extends StatelessWidget {
       child: OutlinedButton(
         onPressed: onTap,
         style: OutlinedButton.styleFrom(
-          foregroundColor: selected ? AppColors.accentGreen : mutedColor,
-          side: BorderSide(
-            color: selected ? AppColors.accentGreen : borderColor,
-          ),
+          foregroundColor: selected ? AppColors.accent : mutedColor,
+          side: BorderSide(color: selected ? AppColors.accent : borderColor),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),

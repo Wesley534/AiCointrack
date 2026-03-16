@@ -234,7 +234,7 @@ class _AuthGateState extends State<AuthGate> {
         body: Center(
           child: CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(
-              AppColors.accentGreen,
+              AppColors.accent,
             ),
           ),
         ),

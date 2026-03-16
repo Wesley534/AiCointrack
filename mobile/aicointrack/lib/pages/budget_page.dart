@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../utils/formatters.dart';
 
 /// Budget overview page – Flutter implementation of the CoinTrack MVP budget screen.
 class BudgetPage extends StatefulWidget {
@@ -71,7 +72,7 @@ class _BudgetPageState extends State<BudgetPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+            valueColor: AlwaysStoppedAnimation(AppColors.accent),
           ),
           const SizedBox(height: 12),
           Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
@@ -168,8 +169,10 @@ class _BudgetPageState extends State<BudgetPage> {
                       OutlinedButton(
                         onPressed: _openBudgetSheet,
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: mutedColor,
-                          side: BorderSide(color: borderColor),
+                          foregroundColor: AppColors.accent,
+                          side: BorderSide(
+                            color: AppColors.accent.withOpacity(0.4),
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
                             vertical: 6,
@@ -190,7 +193,7 @@ class _BudgetPageState extends State<BudgetPage> {
                     children: [
                       _SummaryCard(
                         label: 'Planned',
-                        value: 'Ksh ${totalPlanned.toStringAsFixed(0)}',
+                        value: Formatters.formatKes(totalPlanned),
                         color: mutedColor,
                         cardColor: cardColor,
                         borderColor: borderColor,
@@ -198,7 +201,7 @@ class _BudgetPageState extends State<BudgetPage> {
                       const SizedBox(width: 10),
                       _SummaryCard(
                         label: 'Actual',
-                        value: 'Ksh ${totalActual.toStringAsFixed(0)}',
+                        value: Formatters.formatKes(totalActual),
                         color: AppColors.warning,
                         cardColor: cardColor,
                         borderColor: borderColor,
@@ -206,8 +209,8 @@ class _BudgetPageState extends State<BudgetPage> {
                       const SizedBox(width: 10),
                       _SummaryCard(
                         label: 'Remaining',
-                        value: 'Ksh ${remaining.toStringAsFixed(0)}',
-                        color: AppColors.accentGreen,
+                        value: Formatters.formatKes(remaining),
+                        color: AppColors.accent,
                         cardColor: cardColor,
                         borderColor: borderColor,
                       ),
@@ -265,9 +268,7 @@ class _BudgetPageState extends State<BudgetPage> {
                                   minHeight: 6,
                                   backgroundColor: borderColor,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    over
-                                        ? AppColors.danger
-                                        : AppColors.accentGreen,
+                                    over ? AppColors.danger : AppColors.accent,
                                   ),
                                 ),
                               ),
@@ -277,19 +278,19 @@ class _BudgetPageState extends State<BudgetPage> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    'Planned: Ksh ${planned.toStringAsFixed(0)}',
+                                    'Planned: ${Formatters.formatKes(planned)}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: mutedColor,
                                     ),
                                   ),
                                   Text(
-                                    'Actual: Ksh ${actual.toStringAsFixed(0)}',
+                                    'Actual: ${Formatters.formatKes(actual)}',
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: over
                                           ? AppColors.danger
-                                          : AppColors.accentGreen,
+                                          : AppColors.accent,
                                     ),
                                   ),
                                 ],
@@ -437,7 +438,7 @@ class _BudgetSheetState extends State<_BudgetSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.accentGreen),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
     );
 
@@ -529,8 +530,8 @@ class _BudgetSheetState extends State<_BudgetSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -542,7 +543,7 @@ class _BudgetSheetState extends State<_BudgetSheet> {
                       width: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : Text(_isEditing ? 'Save Changes' : 'Create Category'),
@@ -625,9 +626,9 @@ class _TagChip extends StatelessWidget {
         fg = AppColors.warning;
         break;
       default:
-        border = AppColors.accentGreen.withOpacity(0.25);
-        bg = AppColors.accentGreen.withOpacity(0.1);
-        fg = AppColors.accentGreen;
+        border = AppColors.accent.withOpacity(0.25);
+        bg = AppColors.accent.withOpacity(0.1);
+        fg = AppColors.accent;
     }
 
     return Container(

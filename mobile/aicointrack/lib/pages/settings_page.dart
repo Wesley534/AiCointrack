@@ -97,7 +97,7 @@ class _SettingsPageState extends State<SettingsPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+            valueColor: AlwaysStoppedAnimation(AppColors.accent),
           ),
           const SizedBox(height: 12),
           Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
@@ -198,7 +198,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(24),
                             gradient: const LinearGradient(
-                              colors: [AppColors.accentGreen, AppColors.purple],
+                              colors: [AppColors.accent, AppColors.purple],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -245,13 +245,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
-                                  color: AppColors.accentGreen.withOpacity(
-                                    0.08,
-                                  ),
+                                  color: AppColors.accent.withOpacity(0.08),
                                   border: Border.all(
-                                    color: AppColors.accentGreen.withOpacity(
-                                      0.2,
-                                    ),
+                                    color: AppColors.accent.withOpacity(0.2),
                                   ),
                                 ),
                                 child: Row(
@@ -261,7 +257,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                       width: 6,
                                       height: 6,
                                       decoration: const BoxDecoration(
-                                        color: AppColors.accentGreen,
+                                        color: AppColors.accent,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -363,7 +359,9 @@ class _ToggleSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final trackOff = isDark ? AppColors.darkBorder : AppColors.lightBorder;
+    final trackOff = isDark
+        ? AppColors.darkBorder.withOpacity(0.8)
+        : AppColors.lightBorder;
     final thumbOff = isDark ? AppColors.darkMuted : AppColors.lightMuted;
 
     return AnimatedContainer(
@@ -373,7 +371,7 @@ class _ToggleSwitch extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(99),
-        color: value ? AppColors.accentGreen : trackOff,
+        color: value ? AppColors.accent : trackOff,
       ),
       child: Align(
         alignment: value ? Alignment.centerRight : Alignment.centerLeft,
@@ -382,7 +380,7 @@ class _ToggleSwitch extends StatelessWidget {
           height: 16,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: value ? Colors.black : thumbOff,
+            color: value ? Colors.white : thumbOff,
           ),
         ),
       ),

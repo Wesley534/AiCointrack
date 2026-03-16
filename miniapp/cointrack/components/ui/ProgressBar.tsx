@@ -13,7 +13,7 @@ export default function ProgressBar({ current, total, color }: ProgressBarProps)
   const colors = theme === "light" ? lightTheme : darkTheme
   
   const percentage = Math.min((current / total) * 100, 100)
-  const barColor = color || (theme === "light" ? colors.green : colors.accent)
+  const barColor = color || colors.accent
 
   return (
     <div

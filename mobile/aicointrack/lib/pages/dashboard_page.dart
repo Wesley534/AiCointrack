@@ -155,7 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppColors.accentGreen, AppColors.purple],
+                      colors: [AppColors.accent, AppColors.purple],
                     ),
                   ),
                   child: Center(
@@ -166,7 +166,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -221,7 +221,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ).toggleTheme();
                   Navigator.pop(context);
                 },
-                activeColor: AppColors.accentGreen,
+                activeColor: AppColors.accent,
               ),
             ),
             const Divider(),
@@ -262,9 +262,6 @@ class _DashboardPageState extends State<DashboardPage> {
       case 4:
         body = const SavingsPage();
         break;
-      case 5:
-        body = const PendingTransactionsPage();
-        break;
       default:
         body = _buildDashboardBody(
           bgColor: bgColor,
@@ -288,7 +285,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [AppColors.accentGreen, AppColors.purple],
+                  colors: [AppColors.accent, AppColors.purple],
                 ),
               ),
               child: Center(
@@ -317,7 +314,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.notifications_outlined),
-                    onPressed: () => _setNavIndex(5),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PendingTransactionsPage(),
+                      ),
+                    ),
                   ),
                   if (count > 0)
                     Positioned(
@@ -417,7 +419,14 @@ class _DashboardPageState extends State<DashboardPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: bgColor,
-        border: Border.all(color: isDark ? borderColor : Colors.transparent),
+        border: isDark
+            ? Border(
+                left: BorderSide(
+                  color: AppColors.accent.withOpacity(0.4),
+                  width: 3,
+                ),
+              )
+            : Border.all(color: Colors.transparent),
       ),
       padding: EdgeInsets.all(12),
       child: Column(
@@ -491,9 +500,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   String _transactionAmount(Map<String, dynamic> tx) {
-    final amount = ((tx['amount'] ?? 0) as num).toDouble().toStringAsFixed(0);
+    final amount = ((tx['amount'] ?? 0) as num).toDouble();
     final type = (tx['transaction_type'] ?? 'expense').toString().toLowerCase();
-    return '${type == 'income' ? '+' : '-'}Ksh $amount';
+    return '${type == 'income' ? '+' : '-'}${Formatters.formatKes(amount)}';
+  }
+
+  Color _transactionColor(Map<String, dynamic> tx) {
+    final type = (tx['transaction_type'] ?? 'expense').toString().toLowerCase();
+    return type == 'income' ? AppColors.positive : AppColors.danger;
   }
 
   String _buildInsight(List categories) {
@@ -520,9 +534,8 @@ class _DashboardPageState extends State<DashboardPage> {
     final worst = Map<String, dynamic>.from(sorted.first as Map);
     final overBy =
         ((((worst['actual'] ?? 0) as num) - ((worst['planned'] ?? 0) as num))
-                .toDouble())
-            .toStringAsFixed(0);
-    return "You're on track this month! ${worst['label']} spending is over budget by Ksh $overBy. Consider reducing spending in this category.";
+            .toDouble());
+    return "You're on track this month! ${worst['label']} spending is over budget by ${Formatters.formatKes(overBy)}. Consider reducing spending in this category.";
   }
 
   List<Widget> _buildRecentTransactions(
@@ -623,7 +636,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   padding: EdgeInsets.only(left: 6),
                                   child: _buildPillSmall(
                                     'Onchain',
-                                    AppColors.accentGreen,
+                                    AppColors.accent,
                                   ),
                                 ),
                               if (source == 'cash')
@@ -644,9 +657,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _transactionAmount(t).startsWith('+')
-                      ? AppColors.accentGreen
-                      : AppColors.danger,
+                  color: _transactionColor(t),
                 ),
               ),
             ],
@@ -704,7 +715,6 @@ class _DashboardPageState extends State<DashboardPage> {
       {'icon': '💸', 'label': 'Transactions', 'id': 2},
       {'icon': '🛒', 'label': 'Shopping', 'id': 3},
       {'icon': '🎯', 'label': 'Savings', 'id': 4},
-      {'icon': '🔔', 'label': 'Review', 'id': 5},
     ];
 
     return Container(
@@ -713,67 +723,34 @@ class _DashboardPageState extends State<DashboardPage> {
         color: cardColor,
       ),
       padding: EdgeInsets.only(bottom: 20, top: 10),
-      child: ValueListenableBuilder<int>(
-        valueListenable: pendingCountNotifier,
-        builder: (context, pendingCount, child) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: navItems
-                .map(
-                  (item) => GestureDetector(
-                    onTap: () => _setNavIndex(item['id'] as int),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Text(
-                              item['icon'].toString(),
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                            if (item['id'] == 5 && pendingCount > 0)
-                              Positioned(
-                                right: -8,
-                                top: -6,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 5,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.danger,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    pendingCount > 9 ? '9+' : '$pendingCount',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          item['label'].toString(),
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: _currentNavIndex == item['id']
-                                ? AppColors.accentGreen
-                                : mutedColor,
-                          ),
-                        ),
-                      ],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: navItems
+            .map(
+              (item) => GestureDetector(
+                onTap: () => _setNavIndex(item['id'] as int),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item['icon'].toString(),
+                      style: const TextStyle(fontSize: 18),
                     ),
-                  ),
-                )
-                .toList(),
-          );
-        },
+                    const SizedBox(height: 3),
+                    Text(
+                      item['label'].toString(),
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: _currentNavIndex == item['id']
+                            ? AppColors.accent
+                            : mutedColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -818,6 +795,8 @@ class _DashboardPageState extends State<DashboardPage> {
     final insight = _buildInsight(
       _budgetCategories.cast<Map<String, dynamic>>(),
     );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heroTextColor = isDark ? AppColors.darkText : Colors.white;
 
     return SingleChildScrollView(
       child: Padding(
@@ -855,15 +834,17 @@ class _DashboardPageState extends State<DashboardPage> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: LinearGradient(
-                    colors: bgColor == AppColors.darkBg
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
                         ? [
-                            AppColors.purple.withOpacity(0.13),
-                            AppColors.accentGreen.withOpacity(0.07),
+                            AppColors.accent.withOpacity(0.15),
+                            AppColors.purple.withOpacity(0.08),
                           ]
-                        : [AppColors.accentGreen, AppColors.purple],
+                        : [AppColors.accent, AppColors.accentDim],
                   ),
                   border: Border.all(
-                    color: bgColor == AppColors.darkBg
+                    color: isDark
                         ? AppColors.purple.withOpacity(0.27)
                         : Colors.transparent,
                   ),
@@ -876,27 +857,27 @@ class _DashboardPageState extends State<DashboardPage> {
                       'FREE TO SPEND',
                       style: TextStyle(
                         fontSize: 12,
-                        color: bgColor == AppColors.darkBg
-                            ? mutedColor
-                            : Colors.white.withOpacity(0.85),
+                        color: isDark
+                            ? heroTextColor.withOpacity(0.85)
+                            : heroTextColor.withOpacity(0.85),
                       ),
                     ),
                     const SizedBox(height: 4),
                     _summaryLoading
                         ? _buildSkeletonBox(height: 36, width: 180, radius: 12)
                         : Text(
-                            'Ksh ${freeToSpend.toStringAsFixed(0)}',
+                            Formatters.formatKes(freeToSpend),
                             style: TextStyle(
                               fontSize: 34,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: heroTextColor,
                             ),
                           ),
                     const SizedBox(height: 8),
                     _summaryLoading
                         ? _buildSkeletonBox(height: 28, width: 180, radius: 999)
                         : _buildPill(
-                            '✓ ${variance >= 0 ? '+' : '-'}Ksh ${variance.abs().toStringAsFixed(0)} vs last month',
+                            '✓ ${variance >= 0 ? '+' : '-'}${Formatters.formatKes(variance.abs())} vs last month',
                             AppColors.lightCardWhite,
                           ),
                     const SizedBox(height: 14),
@@ -905,11 +886,11 @@ class _DashboardPageState extends State<DashboardPage> {
                       children: [
                         Text(
                           'Month progress',
-                          style: TextStyle(fontSize: 12, color: mutedColor),
+                          style: TextStyle(fontSize: 12, color: heroTextColor),
                         ),
                         Text(
                           'March 8 / 31',
-                          style: TextStyle(fontSize: 12, color: mutedColor),
+                          style: TextStyle(fontSize: 12, color: heroTextColor),
                         ),
                       ],
                     ),
@@ -921,7 +902,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         minHeight: 4,
                         backgroundColor: borderColor,
                         valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.accentGreen,
+                          AppColors.accent,
                         ),
                       ),
                     ),
@@ -941,7 +922,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ? _buildSkeletonBox(height: 120, radius: 16)
                       : _buildStatCard(
                           'Total Budget',
-                          'Ksh ${totalBudget.toStringAsFixed(0)}',
+                          Formatters.formatKes(totalBudget),
                           textColor,
                           mutedColor,
                           cardColor,
@@ -953,7 +934,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ? _buildSkeletonBox(height: 120, radius: 16)
                       : _buildStatCard(
                           'Spent So Far',
-                          'Ksh ${totalActual.toStringAsFixed(0)}',
+                          Formatters.formatKes(totalActual),
                           textColor,
                           mutedColor,
                           cardColor,
@@ -965,8 +946,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       ? _buildSkeletonBox(height: 120, radius: 16)
                       : _buildStatCard(
                           'Saved',
-                          'Ksh ${totalSaved.toStringAsFixed(0)}',
-                          AppColors.accentGreen,
+                          Formatters.formatKes(totalSaved),
+                          AppColors.accent,
                           mutedColor,
                           cardColor,
                           borderColor,

@@ -134,7 +134,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             controller: _amountCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: TextStyle(color: textColor),
-            decoration: _inputDec('Amount (Ksh)', mutedColor, borderColor),
+            decoration: _inputDec('Amount (KES)', mutedColor, borderColor),
           ),
           const SizedBox(height: 12),
           // Type toggle
@@ -152,7 +152,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               _TypeBtn(
                 label: 'Income',
                 selected: _type == 'income',
-                color: AppColors.accentGreen,
+                color: AppColors.accent,
                 onTap: () => setState(() => _type = 'income'),
               ),
             ],
@@ -201,8 +201,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -214,7 +214,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                       width: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Text('Add Transaction'),
@@ -235,7 +235,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.accentGreen),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
     );
   }

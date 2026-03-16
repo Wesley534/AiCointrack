@@ -89,7 +89,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
               borderRadius: 8,
               border: `1.5px solid ${colors.border}`,
               background: mode === "onchain" ? colors.accent : "transparent",
-              color: mode === "onchain" ? "#000" : colors.text,
+              color: mode === "onchain" ? "#fff" : colors.text,
               fontFamily: "Syne, sans-serif",
               fontWeight: 600,
               fontSize: 12,
@@ -107,7 +107,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
               borderRadius: 8,
               border: `1.5px solid ${colors.border}`,
               background: mode === "offchain" ? colors.accent : "transparent",
-              color: mode === "offchain" ? "#000" : colors.text,
+              color: mode === "offchain" ? "#fff" : colors.text,
               fontFamily: "Syne, sans-serif",
               fontWeight: 600,
               fontSize: 12,
@@ -241,8 +241,8 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           onClick={handleSend}
           disabled={loading}
           style={{
-            background: theme === "light" ? colors.green : colors.accent,
-            color: theme === "light" ? "#fff" : "#000",
+            background: colors.accent,
+            color: "#fff",
             fontFamily: "Syne, sans-serif",
             fontWeight: 700,
             border: "none",

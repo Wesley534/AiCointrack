@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
 import '../services/pending_transactions_service.dart';
+import '../utils/formatters.dart';
 
 class PendingTransactionsPage extends StatefulWidget {
   const PendingTransactionsPage({super.key});
@@ -146,7 +147,7 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
       key: _scaffoldKey,
       backgroundColor: bgColor,
       body: RefreshIndicator(
-        color: AppColors.accentGreen,
+        color: AppColors.accent,
         onRefresh: _loadItems,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
@@ -198,7 +199,7 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                 child: Column(
                   children: [
                     const CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+                      valueColor: AlwaysStoppedAnimation(AppColors.accent),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -242,15 +243,15 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                       height: 88,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.accentGreen.withValues(alpha: 0.1),
+                        color: AppColors.accent.withValues(alpha: 0.1),
                         border: Border.all(
-                          color: AppColors.accentGreen.withValues(alpha: 0.25),
+                          color: AppColors.accent.withValues(alpha: 0.25),
                         ),
                       ),
                       child: const Center(
                         child: Icon(
                           Icons.check_rounded,
-                          color: AppColors.accentGreen,
+                          color: AppColors.accent,
                           size: 42,
                         ),
                       ),
@@ -275,9 +276,7 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
             else
               ..._items.map((tx) {
                 final isIncome = tx.type == 'income';
-                final tone = isIncome
-                    ? AppColors.accentGreen
-                    : AppColors.danger;
+                final tone = isIncome ? AppColors.accent : AppColors.danger;
                 final busy = _busyIds.contains(tx.id);
 
                 return Container(
@@ -334,7 +333,7 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            '${isIncome ? '+' : '-'}KSh ${tx.amount.toStringAsFixed(2)}',
+                            '${isIncome ? '+' : '-'}${Formatters.formatKes(tx.amount)}',
                             style: TextStyle(
                               color: tone,
                               fontWeight: FontWeight.w800,
@@ -402,8 +401,8 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                             child: ElevatedButton(
                               onPressed: busy ? null : () => _approve(tx),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.accentGreen,
-                                foregroundColor: Colors.black,
+                                backgroundColor: AppColors.accent,
+                                foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
@@ -414,7 +413,7 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.black,
+                                        color: Colors.white,
                                       ),
                                     )
                                   : const Text('Approve'),
@@ -552,7 +551,7 @@ class _PendingTxEditSheetState extends State<_PendingTxEditSheet> {
             controller: _amountCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: TextStyle(color: textColor),
-            decoration: _inputDec('Amount (KSh)', mutedColor, borderColor),
+            decoration: _inputDec('Amount (KES)', mutedColor, borderColor),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -573,7 +572,7 @@ class _PendingTxEditSheetState extends State<_PendingTxEditSheet> {
               _TypeChip(
                 label: 'Income',
                 selected: _type == 'income',
-                color: AppColors.accentGreen,
+                color: AppColors.accent,
                 onTap: () => setState(() => _type = 'income'),
               ),
             ],
@@ -606,8 +605,8 @@ class _PendingTxEditSheetState extends State<_PendingTxEditSheet> {
             child: ElevatedButton(
               onPressed: _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -631,7 +630,7 @@ class _PendingTxEditSheetState extends State<_PendingTxEditSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.accentGreen),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
     );
   }

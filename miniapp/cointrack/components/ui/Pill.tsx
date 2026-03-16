@@ -20,9 +20,9 @@ export default function Pill({ children, variant = "default" }: PillProps) {
       color: colors.mid,
     },
     green: {
-      background: theme === "light" ? colors.greenBg : "rgba(0,229,160,0.1)",
-      border: `1px solid ${theme === "light" ? "rgba(0,168,107,0.25)" : "rgba(0,229,160,0.3)"}`,
-      color: theme === "light" ? colors.green : colors.accent,
+      background: colors.accentBg || "rgba(0,82,255,0.08)",
+      border: `1px solid ${theme === "light" ? "rgba(0,82,255,0.25)" : "rgba(0,82,255,0.3)"}`,
+      color: colors.accent,
     },
     warn: {
       background: theme === "light" ? colors.amberBg : "rgba(245,158,11,0.1)",

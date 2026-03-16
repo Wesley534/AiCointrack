@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:intl/intl.dart';
 
 /// Utility formatting helpers used across pages.
 class Formatters {
@@ -36,5 +37,10 @@ class Formatters {
       sb.write(hex[rng.nextInt(16)]);
     }
     return sb.toString();
+  }
+
+  /// Format KES currency with thousands separator
+  static String formatKes(double amount) {
+    return 'KES ${NumberFormat('#,##0', 'en_KE').format(amount)}';
   }
 }

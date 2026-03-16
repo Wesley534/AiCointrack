@@ -28,13 +28,11 @@ export default function WalletCard({ onSend, onDeposit, onSave, onWithdraw }: Wa
   return (
     <div
       style={{
-        background: theme === "light" 
-          ? `linear-gradient(135deg, ${colors.green}, #00c48c)` 
-          : `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
+        background: `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
         borderRadius: 20,
         padding: "24px 20px",
         margin: "0 20px 24px",
-        color: theme === "light" ? "#fff" : "#000",
+        color: "#fff",
       }}
     >
       <div style={{ marginBottom: 20 }}>
@@ -75,7 +73,7 @@ export default function WalletCard({ onSend, onDeposit, onSave, onWithdraw }: Wa
               flexDirection: "column",
               alignItems: "center",
               gap: 6,
-              color: theme === "light" ? "#fff" : "#000",
+              color: "#fff",
               transition: "background 0.2s",
             }}
             onMouseOver={e => (e.currentTarget.style.background = "rgba(255,255,255,0.3)")}

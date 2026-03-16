@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../utils/formatters.dart';
 
 void _shopLog(
   String scope,
@@ -114,7 +115,7 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         const CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+          valueColor: AlwaysStoppedAnimation(AppColors.accent),
         ),
         const SizedBox(height: 14),
         Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
@@ -141,8 +142,8 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('Retry'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accentGreen,
-              foregroundColor: Colors.black,
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
             ),
           ),
         ],
@@ -160,7 +161,7 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              color: AppColors.accentGreen.withOpacity(0.1),
+              color: AppColors.accent.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
             child: const Center(
@@ -188,8 +189,8 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
             icon: const Icon(Icons.add, size: 16),
             label: const Text('Create List'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accentGreen,
-              foregroundColor: Colors.black,
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -240,9 +241,9 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
                         style: TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.accentGreen,
+                        foregroundColor: AppColors.accent,
                         side: BorderSide(
-                          color: AppColors.accentGreen.withOpacity(0.5),
+                          color: AppColors.accent.withOpacity(0.5),
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -286,10 +287,10 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
                       statusFg = AppColors.warning;
                       break;
                     default:
-                      barColor = AppColors.accentGreen;
+                      barColor = AppColors.accent;
                       borderTint = borderColor;
-                      statusBg = AppColors.accentGreen.withOpacity(0.1);
-                      statusFg = AppColors.accentGreen;
+                      statusBg = AppColors.accent.withOpacity(0.1);
+                      statusFg = AppColors.accent;
                   }
 
                   return GestureDetector(
@@ -372,14 +373,14 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Spent: Ksh ${total.toStringAsFixed(0)}',
+                                'Spent: ${Formatters.formatKes(total)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: mutedColor,
                                 ),
                               ),
                               Text(
-                                'Budget: Ksh ${budget.toStringAsFixed(0)}',
+                                'Budget: ${Formatters.formatKes(budget)}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: mutedColor,
@@ -398,7 +399,7 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Over by Ksh ${(total - budget).toStringAsFixed(0)}',
+                                  'Over by ${Formatters.formatKes(total - budget)}',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: AppColors.danger,
@@ -545,7 +546,7 @@ class _NewListSheetState extends State<_NewListSheet> {
           const SizedBox(height: 12),
           _ThemedField(
             controller: _budgetCtrl,
-            label: 'Budget (Ksh)',
+            label: 'Budget (KES)',
             hint: '0',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textColor: textColor,
@@ -563,9 +564,9 @@ class _NewListSheetState extends State<_NewListSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
-                disabledBackgroundColor: AppColors.accentGreen.withOpacity(0.5),
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.accent.withOpacity(0.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -576,7 +577,7 @@ class _NewListSheetState extends State<_NewListSheet> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Text(
@@ -739,7 +740,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text('All items logged as expenses!'),
-          backgroundColor: AppColors.accentGreen,
+          backgroundColor: AppColors.accent,
         ),
       );
       _shopLog(
@@ -769,7 +770,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         const CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+          valueColor: AlwaysStoppedAnimation(AppColors.accent),
         ),
         const SizedBox(height: 14),
         Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
@@ -796,8 +797,8 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('Retry'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.accentGreen,
-              foregroundColor: Colors.black,
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
             ),
           ),
         ],
@@ -872,9 +873,9 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                         style: TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.accentGreen,
+                        foregroundColor: AppColors.accent,
                         side: BorderSide(
-                          color: AppColors.accentGreen.withOpacity(0.5),
+                          color: AppColors.accent.withOpacity(0.5),
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -904,7 +905,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                           Expanded(
                             child: _SummaryCell(
                               label: 'TOTAL ESTIMATED',
-                              value: 'Ksh ${total.toStringAsFixed(0)}',
+                              value: Formatters.formatKes(total),
                               valueColor: textColor,
                               mutedColor: mutedColor,
                             ),
@@ -913,10 +914,10 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                           Expanded(
                             child: _SummaryCell(
                               label: 'REMAINING',
-                              value: 'Ksh ${remaining.toStringAsFixed(0)}',
+                              value: Formatters.formatKes(remaining),
                               valueColor: remaining < 0
                                   ? AppColors.danger
-                                  : AppColors.accentGreen,
+                                  : AppColors.accent,
                               mutedColor: mutedColor,
                               align: CrossAxisAlignment.end,
                             ),
@@ -933,9 +934,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                           minHeight: 6,
                           backgroundColor: borderColor,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            remaining < 0
-                                ? AppColors.danger
-                                : AppColors.accentGreen,
+                            remaining < 0 ? AppColors.danger : AppColors.accent,
                           ),
                         ),
                       ),
@@ -954,7 +953,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                                 'Clear all',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.accentGreen,
+                                  color: AppColors.accent,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1044,12 +1043,12 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                                       height: 24,
                                       decoration: BoxDecoration(
                                         color: isChecked
-                                            ? AppColors.accentGreen
+                                            ? AppColors.accent
                                             : Colors.transparent,
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
                                           color: isChecked
-                                              ? AppColors.accentGreen
+                                              ? AppColors.accent
                                               : borderColor,
                                           width: 1.5,
                                         ),
@@ -1058,7 +1057,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                                           ? const Icon(
                                               Icons.check,
                                               size: 14,
-                                              color: Colors.black,
+                                              color: Colors.white,
                                             )
                                           : null,
                                     ),
@@ -1084,7 +1083,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                                           ),
                                           const SizedBox(height: 2),
                                           Text(
-                                            'Qty: $qty  ·  Ksh ${price.toStringAsFixed(0)} each',
+                                            'Qty: $qty  ·  ${Formatters.formatKes(price)} each',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: mutedColor,
@@ -1094,7 +1093,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                                       ),
                                     ),
                                     Text(
-                                      'Ksh ${(price * qty).toStringAsFixed(0)}',
+                                      Formatters.formatKes(price * qty),
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700,
@@ -1130,10 +1129,11 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                         ? null
                         : () => _checkout(scaffoldCtx),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentGreen,
-                      foregroundColor: Colors.black,
-                      disabledBackgroundColor: AppColors.accentGreen
-                          .withOpacity(0.5),
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.accent.withOpacity(
+                        0.5,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -1144,7 +1144,7 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              color: Colors.black,
+                              color: Colors.white,
                             ),
                           )
                         : const Row(
@@ -1334,7 +1334,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
               Expanded(
                 child: _ThemedField(
                   controller: _priceCtrl,
-                  label: 'Price (Ksh)',
+                  label: 'Price (KES)',
                   hint: '0',
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
@@ -1357,9 +1357,9 @@ class _AddItemSheetState extends State<_AddItemSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
-                disabledBackgroundColor: AppColors.accentGreen.withOpacity(0.5),
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.accent.withOpacity(0.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1370,7 +1370,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                       width: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Text(
@@ -1445,10 +1445,7 @@ class _ThemedField extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(
-                color: AppColors.accentGreen,
-                width: 1.5,
-              ),
+              borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
             ),
           ),
         ),

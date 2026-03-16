@@ -43,7 +43,9 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
-    debugPrint('$_logTag submit start mode=${_isSignUp ? 'signUp' : 'signIn'} email=$email');
+    debugPrint(
+      '$_logTag submit start mode=${_isSignUp ? 'signUp' : 'signIn'} email=$email',
+    );
     setState(() {
       _errorMessage = null;
       _isLoading = true;
@@ -79,7 +81,9 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
         );
       }
     } on FirebaseAuthException catch (e) {
-      debugPrint('$_logTag FirebaseAuthException code=${e.code} message=${e.message}');
+      debugPrint(
+        '$_logTag FirebaseAuthException code=${e.code} message=${e.message}',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = _getAuthErrorMessage(e.code);
@@ -198,7 +202,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     filled: true,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Enter your email';
+                    if (v == null || v.trim().isEmpty)
+                      return 'Enter your email';
                     if (!v.contains('@')) return 'Enter a valid email';
                     return null;
                   },
@@ -209,7 +214,9 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   controller: _passwordController,
                   obscureText: true,
                   decoration: InputDecoration(
-                    labelText: _isSignUp ? 'Password (min 6 characters)' : 'Password',
+                    labelText: _isSignUp
+                        ? 'Password (min 6 characters)'
+                        : 'Password',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -236,8 +243,8 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                             }
                           },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accentGreen,
-                      foregroundColor: Colors.black,
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -248,8 +255,9 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                             width: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.black),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Text(
@@ -268,7 +276,9 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   onPressed: _isLoading
                       ? null
                       : () {
-                          debugPrint('$_logTag toggling mode from ${_isSignUp ? 'signUp' : 'signIn'}');
+                          debugPrint(
+                            '$_logTag toggling mode from ${_isSignUp ? 'signUp' : 'signIn'}',
+                          );
                           setState(() {
                             _isSignUp = !_isSignUp;
                             _errorMessage = null;
@@ -278,7 +288,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     _isSignUp
                         ? 'Already have an account? Sign in'
                         : "Don't have an account? Create one",
-                    style: TextStyle(color: AppColors.accentGreen),
+                    style: TextStyle(color: AppColors.accent),
                   ),
                 ),
               ],

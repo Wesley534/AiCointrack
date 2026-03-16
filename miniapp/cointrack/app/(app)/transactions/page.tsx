@@ -30,8 +30,8 @@ export default function TransactionsPage() {
           <button
             onClick={() => setShowAddSheet(true)}
             style={{
-              background: theme === "light" ? colors.green : colors.accent,
-              color: theme === "light" ? "#fff" : "#000",
+              background: colors.accent,
+              color: "#fff",
               border: "none",
               borderRadius: 12,
               padding: "10px 16px",
@@ -48,10 +48,12 @@ export default function TransactionsPage() {
           </button>
         </div>
 
-        <TransactionList
-          transactions={data?.transactions || []}
-          loading={isLoading}
-        />
+        <div style={{ padding: "0 20px" }}>
+          <TransactionList
+            transactions={data?.transactions || []}
+            loading={isLoading}
+          />
+        </div>
       </div>
 
       <AddTransactionSheet

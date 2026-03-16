@@ -119,9 +119,7 @@ export default function Page() {
         width: 48,
         height: 48,
         borderRadius: 14,
-        background: theme === "light"
-          ? `linear-gradient(135deg, ${colors.green}, #00c48c)`
-          : `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
+        background: `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -168,7 +166,7 @@ export default function Page() {
       </p>
 
       {error && (
-        <div style={{ color: colors.red || "#EF4444", fontSize: 14, marginBottom: 16 }}>
+        <div style={{ color: colors.red, fontSize: 14, marginBottom: 16 }}>
           {error}
         </div>
       )}
@@ -184,7 +182,7 @@ export default function Page() {
             padding: "16px 32px",
             borderRadius: 14,
             border: "none",
-            background: colors.green || colors.accent,
+            background: colors.accent,
             color: "#fff",
             fontWeight: 700,
             fontSize: 16,

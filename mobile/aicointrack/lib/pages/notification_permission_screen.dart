@@ -66,14 +66,14 @@ class _NotificationPermissionScreenState
                 height: 64,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
-                  color: AppColors.accentGreen.withValues(alpha: 0.12),
+                  color: AppColors.accent.withValues(alpha: 0.12),
                   border: Border.all(
-                    color: AppColors.accentGreen.withValues(alpha: 0.3),
+                    color: AppColors.accent.withValues(alpha: 0.3),
                   ),
                 ),
                 child: const Icon(
                   Icons.notifications_active_outlined,
-                  color: AppColors.accentGreen,
+                  color: AppColors.accent,
                   size: 32,
                 ),
               ),
@@ -130,10 +130,10 @@ class _NotificationPermissionScreenState
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: AppColors.accentGreen.withValues(alpha: 0.08),
+                    color: AppColors.accent.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: AppColors.accentGreen.withValues(alpha: 0.2),
+                      color: AppColors.accent.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Row(
@@ -144,7 +144,7 @@ class _NotificationPermissionScreenState
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation(
-                            AppColors.accentGreen,
+                            AppColors.accent,
                           ),
                         ),
                       ),
@@ -164,9 +164,9 @@ class _NotificationPermissionScreenState
                 child: ElevatedButton(
                   onPressed: _checking ? null : _openAndWait,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentGreen,
-                    foregroundColor: Colors.black,
-                    disabledBackgroundColor: AppColors.accentGreen.withValues(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.accent.withValues(
                       alpha: 0.4,
                     ),
                     shape: RoundedRectangleBorder(
@@ -232,7 +232,7 @@ class _FeatureBullet extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: borderColor),
           ),
-          child: Icon(icon, size: 18, color: AppColors.accentGreen),
+          child: Icon(icon, size: 18, color: AppColors.accent),
         ),
         const SizedBox(width: 12),
         Expanded(

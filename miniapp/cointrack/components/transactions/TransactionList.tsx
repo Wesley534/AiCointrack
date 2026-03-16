@@ -45,7 +45,7 @@ export default function TransactionList({ transactions, loading }: TransactionLi
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 20px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {transactions.map(tx => (
         <TransactionItem key={tx.id} transaction={tx} />
       ))}

@@ -81,7 +81,7 @@ class _SavingsPageState extends State<SavingsPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.accentGreen),
+            valueColor: AlwaysStoppedAnimation(AppColors.accent),
           ),
           const SizedBox(height: 12),
           Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
@@ -174,7 +174,7 @@ class _SavingsPageState extends State<SavingsPage> {
                       OutlinedButton(
                         onPressed: _openNewGoalSheet,
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.accentGreen,
+                          foregroundColor: AppColors.accent,
                           side: BorderSide(color: borderColor),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -208,11 +208,11 @@ class _SavingsPageState extends State<SavingsPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Ksh ${totalSaved.toStringAsFixed(0)}',
+                          Formatters.formatKes(totalSaved),
                           style: const TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.accentGreen,
+                            color: AppColors.accent,
                           ),
                         ),
                       ],
@@ -255,7 +255,7 @@ class _SavingsPageState extends State<SavingsPage> {
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: AppColors.accentGreen,
+                                    color: AppColors.accent,
                                   ),
                                 ),
                               ],
@@ -268,7 +268,7 @@ class _SavingsPageState extends State<SavingsPage> {
                                 minHeight: 6,
                                 backgroundColor: borderColor,
                                 valueColor: const AlwaysStoppedAnimation<Color>(
-                                  AppColors.accentGreen,
+                                  AppColors.accent,
                                 ),
                               ),
                             ),
@@ -277,14 +277,14 @@ class _SavingsPageState extends State<SavingsPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Ksh ${saved.toStringAsFixed(0)} saved',
+                                  '${Formatters.formatKes(saved)} saved',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: mutedColor,
                                   ),
                                 ),
                                 Text(
-                                  'Goal: Ksh ${target.toStringAsFixed(0)}',
+                                  'Goal: ${Formatters.formatKes(target)}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: mutedColor,
@@ -299,7 +299,7 @@ class _SavingsPageState extends State<SavingsPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Monthly: Ksh ${monthly.toStringAsFixed(0)}',
+                                  'Monthly: ${Formatters.formatKes(monthly)}',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: mutedColor,
@@ -308,11 +308,9 @@ class _SavingsPageState extends State<SavingsPage> {
                                 OutlinedButton(
                                   onPressed: () => _openContributeSheet(g),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.accentGreen,
+                                    foregroundColor: AppColors.accent,
                                     side: BorderSide(
-                                      color: AppColors.accentGreen.withOpacity(
-                                        0.3,
-                                      ),
+                                      color: AppColors.accent.withOpacity(0.3),
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
@@ -415,7 +413,7 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.accentGreen),
+        borderSide: const BorderSide(color: AppColors.accent),
       ),
     );
 
@@ -472,8 +470,8 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -485,7 +483,7 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
                       width: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Text('Create Goal'),
@@ -591,7 +589,7 @@ class _ContributeSheetState extends State<_ContributeSheet> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.accentGreen),
+                borderSide: const BorderSide(color: AppColors.accent),
               ),
             ),
           ),
@@ -608,8 +606,8 @@ class _ContributeSheetState extends State<_ContributeSheet> {
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accentGreen,
-                foregroundColor: Colors.black,
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -621,7 +619,7 @@ class _ContributeSheetState extends State<_ContributeSheet> {
                       width: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     )
                   : const Text('Add Contribution'),
@@ -750,7 +748,7 @@ class CloseoutPage extends StatelessWidget {
                                 fontSize: 13,
                                 color: c.delta.startsWith('-')
                                     ? AppColors.danger
-                                    : AppColors.accentGreen,
+                                    : AppColors.accent,
                               ),
                             ),
                           ],
@@ -770,8 +768,8 @@ class CloseoutPage extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accentGreen,
-                  foregroundColor: Colors.black,
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -804,7 +802,7 @@ class _StepLabel extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: active ? AppColors.accentGreen : Colors.transparent,
+              color: active ? AppColors.accent : Colors.transparent,
               width: 2,
             ),
           ),
@@ -814,7 +812,7 @@ class _StepLabel extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 10,
-            color: active ? AppColors.accentGreen : mutedColor,
+            color: active ? AppColors.accent : mutedColor,
           ),
         ),
       ),

@@ -13,13 +13,11 @@ export default function BalanceSummary() {
     return (
       <div
         style={{
-          background: theme === "light" 
-            ? `linear-gradient(135deg, ${colors.green}, #00c48c)` 
-            : `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
+          background: `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
           borderRadius: 20,
           padding: "24px 20px",
           margin: "0 20px 20px",
-          color: theme === "light" ? "#fff" : "#000",
+          color: "#fff",
         }}
       >
         <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 8 }}>Loading...</div>
@@ -30,13 +28,11 @@ export default function BalanceSummary() {
   return (
     <div
       style={{
-        background: theme === "light" 
-          ? `linear-gradient(135deg, ${colors.green}, #00c48c)` 
-          : `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
+        background: `linear-gradient(135deg, ${colors.accent}, ${colors.accentDim})`,
         borderRadius: 20,
         padding: "24px 20px",
         margin: "0 20px 20px",
-        color: theme === "light" ? "#fff" : "#000",
+        color: "#fff",
       }}
     >
       <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 8 }}>Total Balance</div>

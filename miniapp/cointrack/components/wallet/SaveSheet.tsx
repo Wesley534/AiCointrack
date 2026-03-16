@@ -131,8 +131,8 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
           onClick={handleSave}
           disabled={loading}
           style={{
-            background: theme === "light" ? colors.green : colors.accent,
-            color: theme === "light" ? "#fff" : "#000",
+            background: colors.accent,
+            color: "#fff",
             fontFamily: "Syne, sans-serif",
             fontWeight: 700,
             border: "none",

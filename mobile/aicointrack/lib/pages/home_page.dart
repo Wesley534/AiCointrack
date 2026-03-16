@@ -165,7 +165,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   const CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.accentGreen,
+                      AppColors.accent,
                     ),
                   ),
                   const SizedBox(height: 24),

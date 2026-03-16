@@ -20,7 +20,7 @@ export default function BudgetSummaryBar({ spent, budget, currency = "KES" }: Bu
   const getStatusColor = () => {
     if (percentage >= 90) return colors.red
     if (percentage >= 75) return theme === "light" ? colors.amber : darkTheme.warning
-    return theme === "light" ? colors.green : colors.accent
+    return colors.positive
   }
 
   return (

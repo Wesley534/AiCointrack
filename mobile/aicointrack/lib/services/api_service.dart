@@ -781,29 +781,29 @@ class ApiService {
         metrics: [
           CloseoutMetric(
             label: 'Income',
-            value: 'Ksh 85,000',
-            color: AppColors.accentGreen,
+            value: 'KES 85,000',
+            color: AppColors.positive,
           ),
           CloseoutMetric(
             label: 'Expenses',
-            value: 'Ksh 67,200',
+            value: 'KES 67,200',
             color: AppColors.danger,
           ),
           CloseoutMetric(
             label: 'Saved',
-            value: 'Ksh 12,800',
-            color: AppColors.accentGreen,
+            value: 'KES 12,800',
+            color: AppColors.positive,
           ),
           CloseoutMetric(
             label: 'Surplus',
-            value: 'Ksh 5,000',
+            value: 'KES 5,000',
             color: AppColors.warning,
           ),
         ],
         categoryDiffs: const [
-          CloseoutCategoryDelta(label: '🍔 Food', delta: '-Ksh 3,600'),
-          CloseoutCategoryDelta(label: '🏠 Rent', delta: 'Ksh 0'),
-          CloseoutCategoryDelta(label: '🚗 Transport', delta: '+Ksh 2,800'),
+          CloseoutCategoryDelta(label: '🍔 Food', delta: '-KES 3,600'),
+          CloseoutCategoryDelta(label: '🏠 Rent', delta: 'KES 0'),
+          CloseoutCategoryDelta(label: '🚗 Transport', delta: '+KES 2,800'),
         ],
       );
 

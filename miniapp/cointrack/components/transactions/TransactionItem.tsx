@@ -63,7 +63,7 @@ export default function TransactionItem({ transaction }: TransactionItemProps) {
           fontSize: 15,
           color: isExpense 
             ? colors.red 
-            : (theme === "light" ? colors.green : colors.accent),
+            : colors.positive,
           marginLeft: 12,
         }}
       >

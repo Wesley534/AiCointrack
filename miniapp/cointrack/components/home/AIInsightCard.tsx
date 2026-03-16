@@ -23,8 +23,8 @@ export default function AIInsightCard({ insight, type = "info" }: AIInsightCardP
       icon: "⚠️",
     },
     success: {
-      bg: theme === "light" ? colors.greenBg : "rgba(0,229,160,0.1)",
-      border: theme === "light" ? "rgba(0,168,107,0.25)" : "rgba(0,229,160,0.3)",
+      bg: colors.positiveBg || "rgba(16,185,129,0.1)",
+      border: theme === "light" ? "rgba(5,150,105,0.25)" : "rgba(16,185,129,0.3)",
       icon: "✨",
     },
   }

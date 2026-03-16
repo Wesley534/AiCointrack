@@ -92,10 +92,10 @@ export default function WithdrawSheet({ isOpen, onClose }: WithdrawSheetProps) {
               style={{
                 flex: 1,
                 background: destinationType === "mpesa" 
-                  ? (theme === "light" ? colors.green : colors.accent)
+                  ? colors.accent
                   : (theme === "light" ? colors.bg2 : colors.card),
                 color: destinationType === "mpesa"
-                  ? (theme === "light" ? "#fff" : "#000")
+                  ? "#fff"
                   : colors.mid,
                 border: `1.5px solid ${colors.border}`,
                 borderRadius: 10,
@@ -112,10 +112,10 @@ export default function WithdrawSheet({ isOpen, onClose }: WithdrawSheetProps) {
               style={{
                 flex: 1,
                 background: destinationType === "bank" 
-                  ? (theme === "light" ? colors.green : colors.accent)
+                  ? colors.accent
                   : (theme === "light" ? colors.bg2 : colors.card),
                 color: destinationType === "bank"
-                  ? (theme === "light" ? "#fff" : "#000")
+                  ? "#fff"
                   : colors.mid,
                 border: `1.5px solid ${colors.border}`,
                 borderRadius: 10,
@@ -184,8 +184,8 @@ export default function WithdrawSheet({ isOpen, onClose }: WithdrawSheetProps) {
           onClick={handleWithdraw}
           disabled={loading}
           style={{
-            background: theme === "light" ? colors.green : colors.accent,
-            color: theme === "light" ? "#fff" : "#000",
+            background: colors.accent,
+            color: "#fff",
             fontFamily: "Syne, sans-serif",
             fontWeight: 700,
             border: "none",

@@ -54,8 +54,8 @@ export default function DepositSheet({ isOpen, onClose }: DepositSheetProps) {
           <button
             onClick={copyAddress}
             style={{
-              background: theme === "light" ? colors.green : colors.accent,
-              color: theme === "light" ? "#fff" : "#000",
+              background: colors.accent,
+              color: "#fff",
               border: "none",
               borderRadius: 8,
               padding: "8px 16px",
