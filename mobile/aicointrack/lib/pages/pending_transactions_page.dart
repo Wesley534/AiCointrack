@@ -106,16 +106,22 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: true,
       builder: (_) => _PendingTxEditSheet(tx: tx),
     );
 
-    if (updated == null || !mounted) return;
-    await _approve(updated);
+    if (!mounted) return;
+
+    if (updated != null) {
+      await _approve(updated);
+    }
   }
 
   void _showMessage(String message) {
     final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
     scaffoldMessenger?.showSnackBar(SnackBar(content: Text(message)));
+    debugPrint('[PendingTx] Message: $message');
   }
 
   String _sourceForApi(String source) {
@@ -477,6 +483,7 @@ class _PendingTxEditSheetState extends State<_PendingTxEditSheet> {
   void dispose() {
     _amountCtrl.dispose();
     _descriptionCtrl.dispose();
+    debugPrint('[PendingTxEditSheet] Disposed controllers');
     super.dispose();
   }
 

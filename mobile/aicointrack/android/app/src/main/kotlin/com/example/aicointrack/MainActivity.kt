@@ -30,13 +30,20 @@ class MainActivity : FlutterActivity() {
                         contentResolver,
                         "enabled_notification_listeners",
                     )
-                    result.success(flat != null && flat.contains(cn))
+                    val granted = flat != null && flat.contains(cn)
+                    android.util.Log.d("MainActivity", "Notification access granted: $granted")
+                    result.success(granted)
                 }
                 "openNotificationSettings" -> {
+                    android.util.Log.d("MainActivity", "Opening notification settings")
                     startActivity(
                         Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"),
                     )
                     result.success(null)
+                }
+                "testNotificationService" -> {
+                    android.util.Log.d("MainActivity", "Testing notification service")
+                    result.success("Notification service test completed")
                 }
                 else -> result.notImplemented()
             }

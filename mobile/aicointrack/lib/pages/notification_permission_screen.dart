@@ -35,6 +35,13 @@ class _NotificationPermissionScreenState
       if (!mounted) return;
       final granted = await NotificationTransactionService.isAccessGranted();
       if (granted) {
+        // Test the service connection
+        try {
+          final testResult = await NotificationTransactionService.testService();
+          debugPrint('[NotificationPermission] Service test result: $testResult');
+        } catch (e) {
+          debugPrint('[NotificationPermission] Service test failed: $e');
+        }
         if (mounted) Navigator.of(context).pop(true);
         return;
       }

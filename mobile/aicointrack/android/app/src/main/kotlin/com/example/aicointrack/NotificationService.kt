@@ -15,35 +15,63 @@ class NotificationService : NotificationListenerService() {
         private const val PREFS_KEY = "flutter.pending_transactions"
     }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        android.util.Log.d("NotificationService", "Service connected successfully")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        android.util.Log.w("NotificationService", "Service disconnected")
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val extras = sbn.notification.extras
-        val title  = extras.getString("android.title") ?: ""
-        val text   = extras.getCharSequence("android.text")?.toString() ?: ""
-        val pkg    = sbn.packageName
+        try {
+            val extras = sbn.notification.extras
+            val title  = extras.getString("android.title") ?: ""
+            val text   = extras.getCharSequence("android.text")?.toString() ?: ""
+            val pkg    = sbn.packageName
 
-        val watchedApps = setOf(
-            "com.safaricom.mpesa",
-            "com.kcbgroup.mobilebanking",
-            "ke.co.equity.mobile",
-            "com.ncba.ke.android",
-            "com.google.android.gm",
-        )
+            val watchedApps = setOf(
+                "com.safaricom.mpesa",
+                "com.kcbgroup.mobilebanking",
+                "ke.co.equity.mobile",
+                "com.ncba.ke.android",
+                "com.google.android.gm",
+            )
 
-        val body = "$title $text"
-        if (pkg !in watchedApps && !body.containsFinancialKeywords()) return
-
-        val channel = MainActivity.notifChannel
-
-        if (channel != null) {
-            Handler(Looper.getMainLooper()).post {
-                channel.invokeMethod(
-                    "onNotification",
-                    mapOf("pkg" to pkg, "title" to title, "text" to text),
-                )
+            val body = "$title $text"
+            if (pkg !in watchedApps && !body.containsFinancialKeywords()) {
+                android.util.Log.d("NotificationService", "Ignoring notification from $pkg: $body")
+                return
             }
-        } else {
-            val parsed = parseTransaction(title, text, pkg) ?: return
-            writeToSharedPrefs(parsed)
+
+            android.util.Log.d("NotificationService", "Processing notification from $pkg")
+            val channel = MainActivity.notifChannel
+
+            if (channel != null) {
+                Handler(Looper.getMainLooper()).post {
+                    try {
+                        channel.invokeMethod(
+                            "onNotification",
+                            mapOf("pkg" to pkg, "title" to title, "text" to text),
+                        )
+                        android.util.Log.d("NotificationService", "Successfully sent notification to Flutter")
+                    } catch (e: Exception) {
+                        android.util.Log.e("NotificationService", "Failed to send notification to Flutter", e)
+                        val parsed = parseTransaction(title, text, pkg)
+                        if (parsed != null) {
+                            writeToSharedPrefs(parsed)
+                        }
+                    }
+                }
+            } else {
+                android.util.Log.d("NotificationService", "Flutter channel not available, writing to SharedPreferences")
+                val parsed = parseTransaction(title, text, pkg) ?: return
+                writeToSharedPrefs(parsed)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationService", "Error processing notification", e)
         }
     }
 
@@ -116,9 +144,12 @@ class NotificationService : NotificationListenerService() {
             }
 
             list.put(tx.toString())
-            prefs.edit().putString(PREFS_KEY, list.toString()).apply()
+            val success = prefs.edit().putString(PREFS_KEY, list.toString()).commit()
+            if (!success) {
+                android.util.Log.e("NotificationService", "Failed to write transaction to SharedPreferences")
+            }
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.e("NotificationService", "Error writing transaction to SharedPreferences", e)
         }
     }
 
