@@ -30,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="base:app_id" content="69a82075bbe150740b4dcfad" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body style={{ margin: 0, padding: 0, fontFamily: "'Outfit', sans-serif" }}>

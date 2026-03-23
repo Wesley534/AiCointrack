@@ -10,7 +10,7 @@ const wagmiConfig = createConfig({
   transports: { [base.id]: http() },
   connectors: [
     coinbaseWallet({
-      appName: "CoinTrack",
+      appName: "AiCoinTrack",
       preference: "smartWalletOnly",
     }),
   ],
