@@ -2,17 +2,23 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAccount, useSignMessage } from "wagmi"
-import { useMiniKit } from "@coinbase/onchainkit/minikit"
 import { authenticateWallet } from "@/lib/auth"
 import { getMe } from "@/lib/api"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 
+// Tell Base app the miniapp is ready (direct call without OnchainKit)
+function setMiniAppReady() {
+  if (typeof window !== "undefined") {
+    const w = window as Window & { miniKit?: { ready: () => void } }
+    w.miniKit?.ready()
+  }
+}
+
 export default function Page() {
   const router = useRouter()
   const { address, isConnected, chainId } = useAccount()
   const { signMessageAsync } = useSignMessage()
-  const { setMiniAppReady } = useMiniKit()
   const { jwt, user, setAuth, logout, theme } = useAppStore()
   const hasHydrated = useAppStore(state => state._hasHydrated)
   const [loading, setLoading] = useState(true)
@@ -23,7 +29,7 @@ export default function Page() {
   // Tell Base app the miniapp is ready
   useEffect(() => {
     setMiniAppReady()
-  }, [setMiniAppReady])
+  }, [])
 
   useEffect(() => {
     if (!hasHydrated) return

@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { useAccount, useSignMessage } from "wagmi"
+import { useAccount, useConnect, useSignMessage, useDisconnect } from "wagmi"
+import { coinbaseWallet } from "wagmi/connectors"
 import { SiweMessage } from "siwe"
-import { ConnectWallet } from "@coinbase/onchainkit/wallet"
 import { getNonce } from "@/lib/api"
-import "@coinbase/onchainkit/styles.css"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,6 +24,8 @@ type Phase =
 
 export default function LoginPage() {
     const { address, isConnected, chainId } = useAccount()
+    const { connect } = useConnect()
+    const { disconnect } = useDisconnect()
     const { signMessageAsync } = useSignMessage()
 
     const [phase, setPhase] = useState<Phase>("idle")
@@ -88,7 +89,7 @@ export default function LoginPage() {
             //    Flutter catches aicointrack://login?address=...&message=...&signature=...
             const params = new URLSearchParams({
                 address: address!,
-                message: messageString,   // URL-encoded by URLSearchParams automatically
+                message: messageString,
                 signature,
             })
             const callbackUrl = `${callbackScheme}://login?${params.toString()}`
@@ -150,17 +151,25 @@ export default function LoginPage() {
                 )}
 
                 {/* Wallet button — shown only when not busy */}
-                {!isBusy && (
-                    <div style={styles.connectWrap} id="base-connect-button">
-                        <ConnectWallet className="ock-connect-btn">
-                            <div style={styles.connectInner}>
-                                <span style={styles.connectIcon}>🔑</span>
-                                <div>
-                                    <div style={styles.connectLabel}>Sign in with Base</div>
-                                    <div style={styles.connectSublabel}>Passkey · no seed phrase</div>
-                                </div>
-                            </div>
-                        </ConnectWallet>
+                {!isBusy && !isConnected && (
+                    <button
+                        id="base-connect-button"
+                        style={styles.connectBtn}
+                        onClick={() => connect({ connector: coinbaseWallet() })}
+                    >
+                        <span style={styles.connectIcon}>🔑</span>
+                        <div>
+                            <div style={styles.connectLabel}>Sign in with Base</div>
+                            <div style={styles.connectSublabel}>Passkey · no seed phrase</div>
+                        </div>
+                    </button>
+                )}
+
+                {/* Connected but not yet redirected */}
+                {!isBusy && isConnected && address && (
+                    <div style={styles.busyWrap} aria-live="polite">
+                        <Spinner />
+                        <span style={styles.busyText}>Wallet connected — authenticating...</span>
                     </div>
                 )}
 
@@ -187,6 +196,20 @@ export default function LoginPage() {
                     </button>
                 )}
 
+                {/* Cancel/Disconnect after error */}
+                {phase === "error" && isConnected && (
+                    <button
+                        style={styles.cancelBtn}
+                        onClick={() => {
+                            disconnect()
+                            setPhase("idle")
+                            setErrorMsg(null)
+                        }}
+                    >
+                        Disconnect & Try Again
+                    </button>
+                )}
+
                 {/* Feature pills */}
                 <div style={styles.pills}>
                     {["🔒 Non-custodial", "⚡ Instant", "🌐 Base Network"].map(p => (
@@ -194,33 +217,6 @@ export default function LoginPage() {
                     ))}
                 </div>
             </div>
-
-            {/* Override OnchainKit button styles to match design */}
-            <style>{`
-        /* Force the ConnectWallet button to fill the container */
-        .ock-connect-btn,
-        .ock-connect-btn button,
-        [data-testid="ockConnectButton"],
-        .ock-connectWallet-button {
-          width: 100% !important;
-          min-height: 56px !important;
-          border-radius: 14px !important;
-          background: linear-gradient(135deg, #0052FF, #0040CC) !important;
-          color: #fff !important;
-          font-size: 16px !important;
-          font-weight: 700 !important;
-          font-family: 'Outfit', sans-serif !important;
-          border: none !important;
-          cursor: pointer !important;
-          box-shadow: 0 0 24px rgba(0,82,255,0.35) !important;
-          transition: opacity 0.15s, transform 0.12s !important;
-        }
-        .ock-connect-btn:hover button,
-        .ock-connect-btn button:hover {
-          opacity: 0.92 !important;
-          transform: translateY(-1px) !important;
-        }
-      `}</style>
         </div>
     )
 }
@@ -353,16 +349,25 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: 15,
         marginTop: 1,
     },
-    connectWrap: {
+    connectBtn: {
         width: "100%",
-        marginBottom: 8,
-    },
-    connectInner: {
+        minHeight: 56,
+        borderRadius: 14,
+        background: "linear-gradient(135deg, #0052FF, #0040CC)",
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: 700,
+        fontFamily: "'Outfit', sans-serif",
+        border: "none",
+        cursor: "pointer",
+        boxShadow: "0 0 24px rgba(0,82,255,0.35)",
+        transition: "opacity 0.15s, transform 0.12s",
         display: "flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: 12,
         padding: "14px 20px",
-        justifyContent: "center",
+        marginBottom: 16,
     },
     connectIcon: {
         fontSize: 22,
@@ -370,11 +375,10 @@ const styles: Record<string, React.CSSProperties> = {
     connectLabel: {
         fontWeight: 700,
         fontSize: 16,
-        color: "#fff",
     },
     connectSublabel: {
         fontSize: 12,
-        color: "rgba(255,255,255,0.65)",
+        opacity: 0.65,
         marginTop: 2,
     },
     busyWrap: {
@@ -403,6 +407,20 @@ const styles: Record<string, React.CSSProperties> = {
         color: blue,
         fontWeight: 700,
         fontSize: 15,
+        cursor: "pointer",
+        fontFamily: "'Outfit', sans-serif",
+        marginBottom: 8,
+        transition: "background 0.15s",
+    },
+    cancelBtn: {
+        width: "100%",
+        padding: "12px 0",
+        borderRadius: 12,
+        border: `1px solid ${border}`,
+        background: "transparent",
+        color: muted,
+        fontWeight: 500,
+        fontSize: 14,
         cursor: "pointer",
         fontFamily: "'Outfit', sans-serif",
         marginBottom: 16,
