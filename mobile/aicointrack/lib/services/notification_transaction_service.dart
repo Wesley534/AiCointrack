@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 /// Bridges Android's NotificationListenerService to Dart and parses
 /// financial transactions out of notification text.
@@ -24,14 +25,24 @@ class NotificationTransactionService {
     required void Function(ParsedNotificationTx tx) onTransaction,
   }) {
     _channel.setMethodCallHandler((call) async {
-      if (call.method != 'onNotification') return;
-      final args = Map<String, String>.from(call.arguments as Map);
-      final tx = _parse(
-        title: args['title'] ?? '',
-        text: args['text'] ?? '',
-        pkg: args['pkg'] ?? '',
-      );
-      if (tx != null) onTransaction(tx);
+      try {
+        if (call.method != 'onNotification') return;
+        final args = Map<String, String>.from(call.arguments as Map);
+        debugPrint('[NotificationService] Received notification: ${args['title']} - ${args['text']}');
+        final tx = _parse(
+          title: args['title'] ?? '',
+          text: args['text'] ?? '',
+          pkg: args['pkg'] ?? '',
+        );
+        if (tx != null) {
+          debugPrint('[NotificationService] Parsed transaction: ${tx.description} (${tx.amount})');
+          onTransaction(tx);
+        } else {
+          debugPrint('[NotificationService] Failed to parse transaction from notification');
+        }
+      } catch (e) {
+        debugPrint('[NotificationService] Error handling notification: $e');
+      }
     });
   }
 
@@ -39,6 +50,12 @@ class NotificationTransactionService {
   static Future<bool> isAccessGranted() async {
     return await _channel.invokeMethod<bool>('isNotificationAccessGranted') ??
         false;
+  }
+
+  /// Tests the notification service connection.
+  static Future<String> testService() async {
+    return await _channel.invokeMethod<String>('testNotificationService') ??
+        'Service test failed';
   }
 
   /// Opens the Android notification listener settings screen.
@@ -66,7 +83,10 @@ class NotificationTransactionService {
       'paid',
       'payment',
     ];
-    if (!moneyWords.any((w) => lower.contains(w))) return null;
+    if (!moneyWords.any((w) => lower.contains(w))) {
+      debugPrint('[NotificationService] No financial keywords found in: $body');
+      return null;
+    }
 
     double? amount;
     String? txType;
@@ -76,21 +96,27 @@ class NotificationTransactionService {
       if (match != null) {
         amount = double.tryParse(match.group(1)!.replaceAll(',', ''));
         txType = entry.value;
+        debugPrint('[NotificationService] Matched pattern: ${entry.key.pattern} -> $amount');
         break;
       }
     }
-    if (amount == null || amount <= 0) return null;
+    if (amount == null || amount <= 0) {
+      debugPrint('[NotificationService] No valid amount found in: $body');
+      return null;
+    }
 
     txType ??=
         lower.contains('received') || lower.contains('credited')
             ? 'income'
             : 'expense';
+    debugPrint('[NotificationService] Determined type: $txType');
 
     final merchantMatch = RegExp(
       r'(?:to|from|at|by)\s+([A-Z][A-Za-z0-9\s&]{2,30}?)(?:\s+(?:Ksh|KES|on\s|Ref|via|\.|,)|$)',
     ).firstMatch(body);
     final description =
         merchantMatch?.group(1)?.trim() ?? _appName(pkg) ?? title;
+    debugPrint('[NotificationService] Extracted description: $description');
 
     // Bucket to the current minute so identical rapid notifications dedup
     final minuteBucket = DateTime.now().millisecondsSinceEpoch ~/ 60000;
