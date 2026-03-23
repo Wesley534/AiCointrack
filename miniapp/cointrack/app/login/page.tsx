@@ -9,8 +9,8 @@ import { getNonce } from "@/lib/api"
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_CHAIN_ID = 8453
-const DOMAIN = "cointrack-nu.vercel.app"
-const ORIGIN = "https://cointrack-nu.vercel.app"
+const DOMAIN = "app.aicointrack.xyz"
+const ORIGIN = "https://app.aicointrack.xyz"
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
             const siweMessage = new SiweMessage({
                 domain: DOMAIN,
                 address,
-                statement: "Sign in to Cointrack",
+                statement: "Sign in to AiCointrack",
                 uri: ORIGIN,
                 version: "1",
                 chainId: effectiveChain,
@@ -136,7 +136,7 @@ export default function LoginPage() {
                     <span style={styles.logoEmoji}>🔵</span>
                 </div>
 
-                <h1 style={styles.heading}>Sign in to CoinTrack</h1>
+                <h1 style={styles.heading}>Sign in to AiCoinTrack</h1>
                 <p style={styles.sub}>
                     Connect your Base smart wallet — secured by passkey,<br />
                     no seed phrase needed.
