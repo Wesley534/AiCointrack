@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -134,6 +135,44 @@ def get_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
+    return tx
+
+
+class FingerprintUpdate(BaseModel):
+    onchain_hash: str       # bytes32 fingerprint (0x + 64 hex)
+    hash_store_tx: str      # Base tx hash of the storeHash() call
+
+
+@router.patch("/{tx_id}/fingerprint", response_model=TransactionResponse)
+def update_fingerprint(
+    tx_id: int,
+    data: FingerprintUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_jwt),
+):
+    """
+    Called by the frontend after successfully storing a hash on HashStore.sol.
+    Updates the transaction record with the on-chain fingerprint.
+    """
+    tx = db.query(Transaction).filter(
+        Transaction.id == tx_id,
+        Transaction.user_id == current_user.id,
+    ).first()
+
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Validate hash format
+    if not data.onchain_hash.startswith("0x") or len(data.onchain_hash) != 66:
+        raise HTTPException(status_code=400, detail="Invalid onchain_hash format")
+    if not data.hash_store_tx.startswith("0x") or len(data.hash_store_tx) != 66:
+        raise HTTPException(status_code=400, detail="Invalid hash_store_tx format")
+
+    tx.onchain_hash = data.onchain_hash
+    tx.hash_store_tx = data.hash_store_tx
+    tx.fingerprint_stored_at = datetime.utcnow()
+    db.commit()
+    db.refresh(tx)
     return tx
 
 @router.get("/", response_model=List[TransactionResponse])

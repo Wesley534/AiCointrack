@@ -1,3 +1,4 @@
+// Base mainnet
 export const BASE_CHAIN_ID = 8453
 
 // USDC on Base mainnet
@@ -5,6 +6,9 @@ export const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
 // Your deployed PocketPal vault contract (add this after you deploy)
 export const VAULT_CONTRACT_ADDRESS = ""
+
+// HashStore contract address for onchain fingerprint storage (set after deployment)
+export const HASH_STORE_ADDRESS = "" as `0x${string}`
 
 // Your FastAPI backend — set NEXT_PUBLIC_API_URL in .env.local
 export const API_BASE_URL =
@@ -30,88 +34,97 @@ export const ERC20_ABI = [
       { name: "amount", type: "uint256" }
     ],
     outputs: [{ name: "", type: "bool" }]
-  }
+  },
+  {
+    name: "allowance",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "approve",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
 ] as const
 
-// Unified theme type
+// HashStore ABI for onchain fingerprint storage
+export const HASH_STORE_ABI = [
+  {
+    name: "storeHash",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "userId", type: "uint256" },
+      { name: "txId", type: "uint256" },
+      { name: "hash", type: "bytes32" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "storeBatch",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "userId", type: "uint256" },
+      { name: "txIds", type: "uint256[]" },
+      { name: "hashes", type: "bytes32[]" },
+    ],
+    outputs: [],
+  },
+  {
+    name: "verifyHash",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      { name: "txId", type: "uint256" },
+      { name: "hash", type: "bytes32" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+] as const
+
+// Theme and UI constants
 export interface Theme {
-  bg: string
-  card: string
-  border: string
-  text: string
-  muted: string
-  // Light theme specific
-  bg2?: string
-  bg3?: string
-  borderMid?: string
-  accent?: string
-  accentDim?: string
-  accentBg?: string
-  positive?: string
-  positiveBg?: string
-  indigo?: string
-  indigoBg?: string
-  amber?: string
-  amberBg?: string
-  red?: string
-  redBg?: string
-  mid?: string
-  white?: string
-  // Dark theme specific
-  surface?: string
-  purple?: string
-  warning?: string
-  danger?: string
+  bg: string; card: string; border: string; text: string; muted: string
+  bg2?: string; bg3?: string; borderMid?: string
+  accent?: string; accentDim?: string; accentBg?: string
+  positive?: string; positiveBg?: string
+  indigo?: string; indigoBg?: string
+  amber?: string; amberBg?: string
+  red?: string; redBg?: string
+  mid?: string; white?: string
+  surface?: string; purple?: string; warning?: string; danger?: string
 }
 
-// Theme colors (Light Mode - Mint Ledger Palette)
 export const lightTheme: Theme = {
-  bg: "#FFFFFF",
-  bg2: "#F4F7F5",
-  bg3: "#EBF5F0",
-  card: "#FFFFFF",
-  border: "#E0EDE7",
-  borderMid: "#C8DDD4",
-  accent: "#0052FF", // Base blue
-  accentDim: "#0047B3",
-  accentBg: "rgba(0,82,255,0.08)",
-  positive: "#059669",
-  positiveBg: "rgba(5,150,105,0.1)",
-  indigo: "#4F46E5",
-  indigoBg: "#EEF2FF",
-  amber: "#D97706",
-  amberBg: "#FFF4E6",
-  red: "#DC2626",
-  redBg: "#FEF0F0",
-  text: "#0F1F17",
-  mid: "#4A6358",
-  muted: "#8FA89C",
-  white: "#FFFFFF",
+  bg: "#FFFFFF", bg2: "#F4F7F5", bg3: "#EBF5F0",
+  card: "#FFFFFF", border: "#E0EDE7", borderMid: "#C8DDD4",
+  accent: "#0052FF", accentDim: "#0047B3", accentBg: "rgba(0,82,255,0.08)",
+  positive: "#059669", positiveBg: "rgba(5,150,105,0.1)",
+  indigo: "#4F46E5", indigoBg: "#EEF2FF",
+  amber: "#D97706", amberBg: "#FFF4E6",
+  red: "#DC2626", redBg: "#FEF0F0",
+  text: "#0F1F17", mid: "#4A6358", muted: "#8FA89C", white: "#FFFFFF",
 }
 
-// Theme colors (Dark Mode) – aligned with mobile AppColors
 export const darkTheme: Theme = {
-  bg: "#0A0D12",
-  surface: "#111620",
-  card: "#161C28",
-  border: "#1E2A3A",
-  accent: "#0052FF", // Base blue
-  accentDim: "#0047B3",
-  purple: "#4F46E5", // AppColors.purple
-  warning: "#D97706", // AppColors.warning
-  danger: "#DC2626", // AppColors.danger
-  text: "#E8EDF5",
-  muted: "#6B7A90",
-  // Aliases for compatibility
-  positive: "#10B981",
-  positiveBg: "rgba(16,185,129,0.1)",
-  red: "#DC2626",
-  mid: "#6B7A90",
-  bg2: "#161C28",
-  bg3: "#1E2A3A",
-  accentBg: "rgba(0,82,255,0.08)",
-  amberBg: "rgba(217,119,6,0.1)",
-  redBg: "rgba(220,38,38,0.1)",
-  indigoBg: "rgba(79,70,229,0.15)",
+  bg: "#0A0D12", surface: "#111620", card: "#161C28", border: "#1E2A3A",
+  accent: "#0052FF", accentDim: "#0047B3",
+  purple: "#4F46E5", warning: "#D97706", danger: "#DC2626",
+  text: "#E8EDF5", muted: "#6B7A90",
+  positive: "#10B981", positiveBg: "rgba(16,185,129,0.1)",
+  red: "#DC2626", mid: "#6B7A90",
+  bg2: "#161C28", bg3: "#1E2A3A",
+  accentBg: "rgba(0,82,255,0.08)", amberBg: "rgba(217,119,6,0.1)",
+  redBg: "rgba(220,38,38,0.1)", indigoBg: "rgba(79,70,229,0.15)",
 }
-

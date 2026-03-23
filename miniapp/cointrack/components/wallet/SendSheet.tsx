@@ -1,10 +1,12 @@
 "use client"
 import { useState } from "react"
+import { useConfig } from "wagmi"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
-import { recordOnchainTx, recordOffchainTx } from "@/lib/api"
+import { recordOnchainTx, recordOffchainTx, updateTransactionFingerprint } from "@/lib/api"
+import { sendUsdc, storeHashOnChain } from "@/lib/wagmi"
 
 interface SendSheetProps {
   isOpen: boolean
@@ -24,13 +26,15 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
   const [offchainSource, setOffchainSource] = useState<"mpesa" | "bank" | "cash">("mpesa")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [step, setStep] = useState<"idle"|"sending"|"storing"|"done">("idle")
+  const config = useConfig()
+  const { user } = useAppStore()
 
   const handleSend = async () => {
     if (!amount) {
       setError("Please enter an amount")
       return
     }
-
     if (mode === "onchain" && !recipient) {
       setError("Please enter a recipient address")
       return
@@ -38,41 +42,81 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
 
     setLoading(true)
     setError("")
+    setStep("idle")
 
     try {
-      const txAmount = parseFloat(amount)
-
       if (mode === "onchain") {
-        // Send onchain USDC
-        const txHash = "0x" + Math.random().toString(16).substring(2, 18)
+        const usdcAmount = parseFloat(amount)
 
-        await recordOnchainTx({
+        // Step 1: Send real USDC on Base Sepolia
+        setStep("sending")
+        const txHash = await sendUsdc(config, recipient, usdcAmount)
+
+        // Step 2: Canonical data for fingerprint
+        const canonicalData = {
+          amount: usdcAmount,
+          currency: "USDC",
+          description: description || `Sent to ${recipient.slice(0, 8)}...`,
+          recipient: recipient.toLowerCase(),
+          transaction_type: "expense",
+          timestamp: new Date().toISOString().slice(0, 19) + "Z",
+        }
+
+        // Step 3: Record in backend DB to get tx id
+        const { data: savedTx } = await recordOnchainTx({
           tx_hash: txHash,
-          amount_usdc: txAmount,
+          amount_usdc: usdcAmount,
           recipient,
-          note: description || "Sent via miniapp",
+          note: canonicalData.description,
           category: "Transfer",
+          transaction_type: "expense",
         })
+
+        // Step 4: Store fingerprint on HashStore contract (non-fatal)
+        if (user?.id && savedTx?.id) {
+          try {
+            setStep("storing")
+            const fingerprint = await storeHashOnChain(
+              config,
+              user.id,
+              savedTx.id,
+              canonicalData
+            )
+            console.log("On-chain fingerprint stored:", fingerprint)
+            console.log("View on explorer: https://sepolia.basescan.org/tx/" + txHash)
+
+            // Step 5: Update backend with the fingerprint
+            await updateTransactionFingerprint(savedTx.id, fingerprint, txHash)
+          } catch (hashErr) {
+            console.warn("Hash storage failed (non-fatal):", hashErr)
+          }
+        }
       } else {
-        // Record offchain transaction
+        const txAmount = parseFloat(amount)
         await recordOffchainTx({
           amount: txAmount,
           description: description || `Sent via ${offchainSource}`,
           source: offchainSource,
           category: "Transfer",
           currency: "KES",
+          transaction_type: "expense",
         })
       }
 
-      // Reset and close
       setRecipient("")
       setAmount("")
       setDescription("")
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transaction failed")
+      const msg = err instanceof Error ? err.message : "Transaction failed"
+      if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
+        setError("Transaction cancelled. Tap Send to try again.")
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
+      setStep("done")
     }
   }
 
@@ -234,6 +278,13 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         {error && (
           <div style={{ color: colors.red, fontSize: 13, textAlign: "center" }}>
             {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ color: colors.muted, fontSize: 12, textAlign: "center", marginBottom: 8 }}>
+            {step === "sending" && "⏳ Waiting for wallet confirmation..."}
+            {step === "storing" && "🔗 Storing fingerprint on Base..."}
           </div>
         )}
 
