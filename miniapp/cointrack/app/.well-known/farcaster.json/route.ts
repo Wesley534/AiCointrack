@@ -17,5 +17,5 @@ function withValidManifest(config: typeof minikitConfig.miniapp) {
 }
 
 export async function GET() {
-  return Response.json(withValidManifest(minikitConfig));
+  return Response.json(withValidManifest(minikitConfig.miniapp));
 }
