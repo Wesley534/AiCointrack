@@ -50,8 +50,10 @@ class _WalletOptionsPageState extends State<WalletOptionsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Wallet created! You can export it later in Settings.'),
-            backgroundColor: AppColors.accentGreen,
+            content: Text(
+              'Wallet created! You can export it later in Settings.',
+            ),
+            backgroundColor: AppColors.accent,
           ),
         );
         goToDashboard(user);
@@ -132,7 +134,8 @@ class _WalletOptionsPageState extends State<WalletOptionsPage> {
               _OptionCard(
                 icon: Icons.add_circle_outline,
                 title: 'Create one for me',
-                subtitle: 'We\'ll set up a Base wallet (exportable to Base app)',
+                subtitle:
+                    'We\'ll set up a Base wallet (exportable to Base app)',
                 borderColor: borderColor,
                 onTap: _isCreatingWallet ? null : _createPrivyWallet,
                 trailing: _isCreatingWallet
@@ -164,18 +167,15 @@ class _WalletOptionsPageState extends State<WalletOptionsPage> {
                 child: ElevatedButton(
                   onPressed: goToDashboard,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accentGreen,
-                    foregroundColor: Colors.black,
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: const Text(
                     'Continue to app',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -245,7 +245,10 @@ class _OptionCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) trailing! else const Icon(Icons.chevron_right),
+              if (trailing != null)
+                trailing!
+              else
+                const Icon(Icons.chevron_right),
             ],
           ),
         ),

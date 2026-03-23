@@ -54,7 +54,7 @@ export default function BottomNav() {
               gap: 3,
               padding: 0,
               color: isActive
-                ? (theme === "light" ? colors.green : colors.accent)
+                ? colors.accent
                 : colors.muted,
               transition: "color 0.2s",
             }}

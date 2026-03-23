@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import BottomSheet from "@/components/ui/BottomSheet"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
@@ -26,13 +26,23 @@ const BUDGET_TAGS = ["Food", "Transport", "Entertainment", "Utilities", "Shoppin
 export default function EditBudgetSheet({ isOpen, onClose, budget, onSuccess }: EditBudgetSheetProps) {
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
-  const [label, setLabel] = useState(budget?.label || "")
-  const [planned, setPlanned] = useState(budget?.planned?.toString() || "")
-  const [tag, setTag] = useState(budget?.tag || BUDGET_TAGS[0])
-  const [kind, setKind] = useState(budget?.kind || BUDGET_KINDS[0])
-  const [month, setMonth] = useState(budget?.month || new Date().toISOString().slice(0, 7))
+  const [label, setLabel] = useState("")
+  const [planned, setPlanned] = useState("")
+  const [tag, setTag] = useState(BUDGET_TAGS[0])
+  const [kind, setKind] = useState(BUDGET_KINDS[0])
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7))
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (budget) {
+      setLabel(budget.label || "")
+      setPlanned(budget.planned?.toString() || "")
+      setTag(budget.tag || BUDGET_TAGS[0])
+      setKind(budget.kind || BUDGET_KINDS[0])
+      setMonth(budget.month || new Date().toISOString().slice(0, 7))
+    }
+  }, [budget])
 
   const handleSubmit = async () => {
     if (!label.trim()) {
@@ -163,6 +173,12 @@ export default function EditBudgetSheet({ isOpen, onClose, budget, onSuccess }: 
                 background: colors.bg,
                 color: colors.text,
                 fontSize: 16,
+                appearance: "none" as const,
+                WebkitAppearance: "none" as const,
+                backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${encodeURIComponent(colors.muted)}' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 12px center",
+                paddingRight: "36px",
               }}
             >
               {BUDGET_KINDS.map(k => (
@@ -196,6 +212,12 @@ export default function EditBudgetSheet({ isOpen, onClose, budget, onSuccess }: 
                 background: colors.bg,
                 color: colors.text,
                 fontSize: 16,
+                appearance: "none" as const,
+                WebkitAppearance: "none" as const,
+                backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${encodeURIComponent(colors.muted)}' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 12px center",
+                paddingRight: "36px",
               }}
             >
               {BUDGET_TAGS.map(t => (
@@ -231,6 +253,12 @@ export default function EditBudgetSheet({ isOpen, onClose, budget, onSuccess }: 
               background: colors.bg,
               color: colors.text,
               fontSize: 16,
+              appearance: "none" as const,
+              WebkitAppearance: "none" as const,
+              backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${encodeURIComponent(colors.muted)}' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 12px center",
+              paddingRight: "36px",
             }}
           />
         </div>
@@ -241,7 +269,7 @@ export default function EditBudgetSheet({ isOpen, onClose, budget, onSuccess }: 
               padding: 12,
               borderRadius: 8,
               background: "rgba(239, 68, 68, 0.1)",
-              color: "#EF4444",
+              color: colors.red,
               fontSize: 14,
               marginBottom: 20,
             }}

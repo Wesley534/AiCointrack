@@ -42,7 +42,11 @@ export default function BottomSheet({ isOpen, onClose, title, children }: Bottom
           borderTopRightRadius: 24,
           padding: "20px 20px 32px",
           zIndex: 999,
-          boxShadow: "0 -4px 24px rgba(0,0,0,0.12)",
+          maxHeight: "90vh",
+          overflowY: "auto" as const,
+          boxShadow: theme === "light"
+            ? "0 -8px 32px rgba(0,0,0,0.12), 0 -1px 0 rgba(0,0,0,0.06)"
+            : "0 -4px 24px rgba(0,0,0,0.4)",
           animation: "slideUp 0.3s ease-out",
         }}
       >

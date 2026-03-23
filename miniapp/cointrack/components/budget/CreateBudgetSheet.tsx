@@ -152,6 +152,12 @@ export default function CreateBudgetSheet({ isOpen, onClose, onSuccess }: Create
                 background: colors.bg,
                 color: colors.text,
                 fontSize: 16,
+                appearance: "none" as const,
+                WebkitAppearance: "none" as const,
+                backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${encodeURIComponent(colors.muted)}' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 12px center",
+                paddingRight: "36px",
               }}
             >
               {BUDGET_KINDS.map(k => (
@@ -185,6 +191,12 @@ export default function CreateBudgetSheet({ isOpen, onClose, onSuccess }: Create
                 background: colors.bg,
                 color: colors.text,
                 fontSize: 16,
+                appearance: "none" as const,
+                WebkitAppearance: "none" as const,
+                backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${encodeURIComponent(colors.muted)}' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 12px center",
+                paddingRight: "36px",
               }}
             >
               {BUDGET_TAGS.map(t => (
@@ -220,6 +232,12 @@ export default function CreateBudgetSheet({ isOpen, onClose, onSuccess }: Create
               background: colors.bg,
               color: colors.text,
               fontSize: 16,
+              appearance: "none" as const,
+              WebkitAppearance: "none" as const,
+              backgroundImage: `url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='${encodeURIComponent(colors.muted)}' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 12px center",
+              paddingRight: "36px",
             }}
           />
         </div>
@@ -230,7 +248,7 @@ export default function CreateBudgetSheet({ isOpen, onClose, onSuccess }: Create
               padding: 12,
               borderRadius: 8,
               background: "rgba(239, 68, 68, 0.1)",
-              color: "#EF4444",
+              color: colors.red,
               fontSize: 14,
               marginBottom: 20,
             }}

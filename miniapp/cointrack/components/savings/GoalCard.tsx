@@ -76,7 +76,7 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
         <ProgressBar
           current={currentAmount}
           total={targetAmount}
-          color={theme === "light" ? colors.green : colors.accent}
+          color={colors.accent}
         />
       </div>
 
@@ -88,8 +88,8 @@ export default function GoalCard({ goal, onContribute }: GoalCardProps) {
           <button
             onClick={onContribute}
             style={{
-              background: theme === "light" ? colors.green : colors.accent,
-              color: theme === "light" ? "#fff" : "#000",
+              background: colors.accent,
+              color: "#fff",
               border: "none",
               borderRadius: 8,
               padding: "6px 12px",

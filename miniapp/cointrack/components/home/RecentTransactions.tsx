@@ -102,7 +102,7 @@ export default function RecentTransactions() {
                   fontFamily: "Syne, sans-serif",
                   fontWeight: 700,
                   fontSize: 15,
-                  color: tx.amount < 0 ? colors.red : colors.green,
+                  color: tx.amount < 0 ? colors.red : colors.positive,
                 }}
               >
                 {tx.amount < 0 ? "-" : "+"}

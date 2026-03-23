@@ -21,7 +21,7 @@ export const minikitConfig = {
   },
   miniapp: {
     version: "1",
-    name: "cointrack",
+    name: "AiCoinTrack",
     subtitle: "",
     description: "",
     screenshotUrls: [],

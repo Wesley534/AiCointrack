@@ -157,7 +157,7 @@ export default function AddItemSheet({ isOpen, onClose, listId, onSuccess }: Add
               padding: 12,
               borderRadius: 8,
               background: "rgba(239, 68, 68, 0.1)",
-              color: "#EF4444",
+              color: colors.red,
               fontSize: 14,
               marginBottom: 20,
             }}

@@ -12,6 +12,7 @@ interface TransactionItemProps {
     category?: string | { name: string }
     date: string
     source: string
+    onchain_hash?: string
   }
 }
 
@@ -55,6 +56,25 @@ export default function TransactionItem({ transaction }: TransactionItemProps) {
             {formatRelativeDate(transaction.date)}
           </span>
         </div>
+        {transaction.onchain_hash && (
+          <a
+            href={`https://sepolia.basescan.org/search?q=${transaction.onchain_hash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              color: colors.positive,
+              textDecoration: "none",
+              marginTop: 4,
+            }}
+          >
+            <span>✓</span>
+            <span>Verified on-chain</span>
+          </a>
+        )}
       </div>
       <div
         style={{
@@ -63,7 +83,7 @@ export default function TransactionItem({ transaction }: TransactionItemProps) {
           fontSize: 15,
           color: isExpense 
             ? colors.red 
-            : (theme === "light" ? colors.green : colors.accent),
+            : colors.positive,
           marginLeft: 12,
         }}
       >

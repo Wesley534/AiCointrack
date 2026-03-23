@@ -7,6 +7,7 @@ import '../firebase_options.dart';
 import '../config/constants.dart';
 import '../config/theme.dart';
 import 'email_login_page.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -16,7 +17,9 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const _logTag = '[LoginPage]';
+
   // ── Loading flags — one per auth method ──────────────────────────────────────
   bool _isBaseLoading = false;
   bool _isGoogleLoading = false;
@@ -25,12 +28,15 @@ class _LoginPageState extends State<LoginPage>
 
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
+  String? _lastBuildState;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    debugPrint('$_logTag initState');
 
     _fadeCtrl = AnimationController(
       vsync: this,
@@ -45,16 +51,25 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    debugPrint('$_logTag dispose');
     _fadeCtrl.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('$_logTag appLifecycleState=$state mounted=$mounted');
+  }
+
   Future<void> _initReown() async {
     if (!mounted) return;
+    debugPrint('$_logTag Reown init start');
     try {
       await ReownAuthService.init(context);
+      debugPrint('$_logTag Reown init success');
     } catch (e) {
-      debugPrint('Reown init error (non-fatal): $e');
+      debugPrint('$_logTag Reown init error (non-fatal): $e');
     }
   }
 
@@ -62,12 +77,14 @@ class _LoginPageState extends State<LoginPage>
 
   /// Opens the miniapp /login page via flutter_web_auth_2 → Base smart wallet.
   Future<void> _handleBaseSignIn() async {
+    debugPrint('$_logTag Base sign-in tapped');
     setState(() {
       _isBaseLoading = true;
       _errorMessage = null;
     });
     try {
       final success = await BaseAuthService.loginWithBase(context);
+      debugPrint('$_logTag Base sign-in completed success=$success');
       if (!success && mounted) {
         // User cancelled — silent dismiss.
         setState(() { _isBaseLoading = false; });
@@ -75,6 +92,7 @@ class _LoginPageState extends State<LoginPage>
       // On success the StreamBuilder in main.dart detects the auth state
       // change (Firebase + JWT) and swaps LoginPage → HomePage automatically.
     } catch (e) {
+      debugPrint('$_logTag Base sign-in error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Base sign-in failed: ${_friendlyError(e)}';
@@ -86,6 +104,7 @@ class _LoginPageState extends State<LoginPage>
 
   /// Google Sign-In via Firebase.
   Future<void> _handleGoogleSignIn() async {
+    debugPrint('$_logTag Google sign-in tapped');
     setState(() {
       _isGoogleLoading = true;
       _errorMessage = null;
@@ -100,13 +119,25 @@ class _LoginPageState extends State<LoginPage>
         return;
       }
       final cred = await AuthService.signInWithGoogle();
+      debugPrint('$_logTag Google sign-in credential received=${cred != null}');
       if (cred == null && mounted) {
         setState(() { _isGoogleLoading = false; });
         return;
       }
+      if (mounted) {
+        setState(() {
+          _isGoogleLoading = false;
+        });
+        debugPrint('$_logTag Google sign-in navigating to HomePage');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
+      }
       // On success the StreamBuilder in main.dart detects the Firebase auth
       // state change and swaps LoginPage → HomePage automatically.
     } on FirebaseAuthException catch (e) {
+      debugPrint('$_logTag Google sign-in FirebaseAuthException: ${e.code}');
       if (mounted) {
         setState(() {
           _errorMessage = _getFirebaseError(e.code);
@@ -114,6 +145,7 @@ class _LoginPageState extends State<LoginPage>
         });
       }
     } catch (e) {
+      debugPrint('$_logTag Google sign-in error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Google sign-in failed: ${_friendlyError(e)}';
@@ -125,6 +157,7 @@ class _LoginPageState extends State<LoginPage>
 
   /// Reown AppKit — WalletConnect v2 modal (MetaMask, Rainbow, Trust, etc.).
   Future<void> _handleReownSignIn() async {
+    debugPrint('$_logTag Reown sign-in tapped');
     if (AppConstants.REOWN_PROJECT_ID == 'YOUR_REOWN_PROJECT_ID') {
       setState(() {
         _errorMessage =
@@ -138,6 +171,7 @@ class _LoginPageState extends State<LoginPage>
     });
     try {
       final success = await ReownAuthService.loginWithWallet(context);
+      debugPrint('$_logTag Reown sign-in completed success=$success');
       if (!success && mounted) {
         setState(() {
           _errorMessage = 'Wallet connection cancelled or failed.';
@@ -147,6 +181,7 @@ class _LoginPageState extends State<LoginPage>
       // On success the StreamBuilder in main.dart detects the auth state
       // change and swaps LoginPage → HomePage automatically.
     } catch (e) {
+      debugPrint('$_logTag Reown sign-in error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = 'Wallet sign-in failed: ${_friendlyError(e)}';
@@ -196,6 +231,13 @@ class _LoginPageState extends State<LoginPage>
     final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
     final anyLoading = _isBaseLoading || _isGoogleLoading || _isReownLoading;
+    final buildState =
+        'loading(base=$_isBaseLoading,google=$_isGoogleLoading,reown=$_isReownLoading) '
+        'error=${_errorMessage != null}';
+    if (_lastBuildState != buildState) {
+      _lastBuildState = buildState;
+      debugPrint('$_logTag build state -> $buildState');
+    }
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -258,11 +300,14 @@ class _LoginPageState extends State<LoginPage>
                     borderColor: borderColor,
                     mutedColor: mutedColor,
                     icon: Icons.email_outlined,
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const EmailLoginPage(isSignUp: false),
-                      ),
-                    ),
+                    onPressed: () {
+                      debugPrint('$_logTag Navigating to EmailLoginPage');
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const EmailLoginPage(isSignUp: false),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 28),
 
@@ -281,9 +326,9 @@ class _LoginPageState extends State<LoginPage>
                     sublabel: 'MetaMask, Rainbow, Trust & 400+ wallets',
                     loading: _isReownLoading,
                     disabled: anyLoading,
-                    borderColor: AppColors.accentGreen.withValues(alpha: 0.4),
+                    borderColor: AppColors.accent.withValues(alpha: 0.4),
                     mutedColor: mutedColor,
-                    accentColor: AppColors.accentGreen,
+                    accentColor: AppColors.accent,
                     icon: Icons.link_rounded,
                     onPressed: _handleReownSignIn,
                   ),

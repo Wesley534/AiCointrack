@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Common colors - updated from MVP design
-  static const Color accentGreen = Color(0xFF00A86B); // MVP green
-  static const Color accentGreenDim = Color(0xFF007A4D); // MVP greenDim
+  static const Color accent = Color(0xFF0052FF); // Base blue — primary CTA
+  static const Color accentDim = Color(0xFF0040CC); // Base blue dim
+  static const Color accentBg = Color(0x140052FF); // Base blue 8% opacity bg
+
+  static const Color positive = Color(0xFF059669); // light mode income green
+  static const Color positiveDark = Color(0xFF10B981); // dark mode income green
   static const Color purple = Color(0xFF4F46E5); // MVP indigo
   static const Color warning = Color(0xFFD97706); // MVP amber
   static const Color danger = Color(0xFFDC2626); // MVP red
@@ -27,7 +31,7 @@ class AppColors {
   static const Color lightText = Color(0xFF0F1F17); // MVP text
   static const Color lightMid = Color(0xFF4A6358); // MVP mid
   static const Color lightMuted = Color(0xFF8FA89C); // MVP muted
-  
+
   // MVP accent backgrounds
   static const Color greenBg = Color(0xFFE8F9F2);
   static const Color indigoBg = Color(0xFFEEF2FF);
@@ -54,12 +58,12 @@ class AppTheme {
   // Dark Theme
   static ThemeData darkTheme = ThemeData(
     brightness: Brightness.dark,
-    primaryColor: AppColors.accentGreen,
+    primaryColor: AppColors.accent,
     scaffoldBackgroundColor: AppColors.darkBg,
     cardColor: AppColors.darkCard,
     useMaterial3: true,
     colorScheme: ColorScheme.dark(
-      primary: AppColors.accentGreen,
+      primary: AppColors.accent,
       secondary: AppColors.purple,
       surface: AppColors.darkSurface,
       error: AppColors.danger,
@@ -130,19 +134,16 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.accentGreen, width: 1.5),
+        borderSide: BorderSide(color: AppColors.accent, width: 1.5),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accentGreen,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.white,
         padding: EdgeInsets.symmetric(horizontal: 28, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 16,
-        ),
+        textStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
       ),
     ),
   );
@@ -150,12 +151,12 @@ class AppTheme {
   // Light Theme
   static ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
-    primaryColor: AppColors.accentGreen,
+    primaryColor: AppColors.accent,
     scaffoldBackgroundColor: AppColors.lightBg,
     cardColor: AppColors.lightCard,
     useMaterial3: true,
     colorScheme: ColorScheme.light(
-      primary: AppColors.accentGreen,
+      primary: AppColors.accent,
       secondary: AppColors.purple,
       surface: AppColors.lightSurface,
       error: AppColors.danger,
@@ -226,19 +227,16 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.accentGreen, width: 1.5),
+        borderSide: BorderSide(color: AppColors.accent, width: 1.5),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accentGreen,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.white,
         padding: EdgeInsets.symmetric(horizontal: 28, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 16,
-        ),
+        textStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
       ),
     ),
   );

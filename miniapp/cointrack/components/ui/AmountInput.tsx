@@ -93,8 +93,8 @@ export default function AmountInput({ value, onChange, label, showKesEquivalent 
         <button
           onClick={toggleCurrency}
           style={{
-            background: theme === "light" ? colors.green : colors.accent,
-            color: theme === "light" ? "#fff" : "#000",
+            background: colors.accent,
+            color: "#fff",
             border: "none",
             borderRadius: 8,
             padding: "6px 12px",

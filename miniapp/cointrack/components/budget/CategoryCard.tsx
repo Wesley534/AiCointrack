@@ -24,7 +24,7 @@ export default function CategoryCard({ category }: CategoryCardProps) {
   const typeColors = {
     need: theme === "light" ? colors.indigo : darkTheme.purple,
     want: theme === "light" ? colors.amber : darkTheme.warning,
-    save: theme === "light" ? colors.green : colors.accent,
+    save: colors.accent,
   }
 
   return (

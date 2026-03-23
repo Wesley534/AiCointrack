@@ -60,7 +60,9 @@ export default function ShoppingListDetailPage() {
     )
   }
 
-  const percentUsed = (list.total / list.total + list.remaining) * 100
+  const percentUsed = list.total + list.remaining > 0
+    ? (list.total / (list.total + list.remaining)) * 100
+    : 0
 
   return (
     <div>
@@ -101,7 +103,7 @@ export default function ShoppingListDetailPage() {
                   fontFamily: "Syne, sans-serif",
                   fontWeight: 700,
                   fontSize: 24,
-                  color: list.remaining < 0 ? "#EF4444" : colors.green,
+                  color: list.remaining < 0 ? colors.red : colors.positive,
                 }}
               >
                 {formatUSD(list.remaining)}
@@ -122,7 +124,7 @@ export default function ShoppingListDetailPage() {
               style={{
                 height: "100%",
                 width: `${Math.min(percentUsed, 100)}%`,
-                background: list.remaining < 0 ? "#EF4444" : colors.accent,
+                background: list.remaining < 0 ? colors.red : colors.accent,
                 transition: "width 0.3s",
               }}
             />

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'token_service.dart';
 
@@ -15,10 +18,14 @@ class AuthService {
   /// Throws [FirebaseAuthException] or generic [Exception] on failure.
   static Future<UserCredential?> signInWithGoogle() async {
     try {
+      debugPrint('[AuthService] signInWithGoogle start');
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       // User cancelled the sign-in flow
-      if (googleUser == null) return null;
+      if (googleUser == null) {
+        debugPrint('[AuthService] signInWithGoogle cancelled by user');
+        return null;
+      }
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
@@ -28,7 +35,9 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      return await _firebaseAuth.signInWithCredential(credential);
+      final result = await _firebaseAuth.signInWithCredential(credential);
+      debugPrint('[AuthService] signInWithGoogle success uid=${result.user?.uid}');
+      return result;
     } on FirebaseAuthException {
       rethrow;
     } catch (e) {
@@ -43,10 +52,13 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    return await _firebaseAuth.signInWithEmailAndPassword(
+    debugPrint('[AuthService] signInWithEmail start email=$email');
+    final result = await _firebaseAuth.signInWithEmailAndPassword(
       email: email,
       password: password,
     );
+    debugPrint('[AuthService] signInWithEmail success uid=${result.user?.uid}');
+    return result;
   }
 
   /// Create a new account with email and password.
@@ -56,6 +68,7 @@ class AuthService {
     required String password,
     String? displayName,
   }) async {
+    debugPrint('[AuthService] createUserWithEmail start email=$email');
     final cred = await _firebaseAuth.createUserWithEmailAndPassword(
       email: email,
       password: password,
@@ -63,6 +76,7 @@ class AuthService {
     if (displayName != null && displayName.isNotEmpty && cred.user != null) {
       await cred.user!.updateDisplayName(displayName);
     }
+    debugPrint('[AuthService] createUserWithEmail success uid=${cred.user?.uid}');
     return cred;
   }
 
@@ -74,7 +88,10 @@ class AuthService {
   /// firebase_custom_token which is passed here so the Firebase auth stream
   /// also becomes authenticated (enabling features that depend on Firebase Auth).
   static Future<UserCredential> signInWithCustomToken(String token) async {
-    return await _firebaseAuth.signInWithCustomToken(token);
+    debugPrint('[AuthService] signInWithCustomToken start');
+    final result = await _firebaseAuth.signInWithCustomToken(token);
+    debugPrint('[AuthService] signInWithCustomToken success uid=${result.user?.uid}');
+    return result;
   }
 
   // ─── Sign Out ──────────────────────────────────────────────────────────────
@@ -141,20 +158,53 @@ class AuthService {
   ///
   /// This means wallet users who never get a Firebase session are still treated
   /// as signed-in as long as their JWT is present in SharedPreferences.
-  static Stream<bool> appAuthStateChanges() async* {
-    // First, immediately check JWT so there's no flicker on hot restart
-    final initialJwt = await TokenService.getJwt();
-    if (initialJwt != null && initialJwt.isNotEmpty) {
-      yield true;
-    }
+  static Stream<bool> appAuthStateChanges() {
+    debugPrint('[AuthService] appAuthStateChanges started');
 
-    await for (final user in _firebaseAuth.authStateChanges()) {
-      if (user != null) {
-        yield true;
-      } else {
-        final jwt = await TokenService.getJwt();
-        yield jwt != null && jwt.isNotEmpty;
-      }
-    }
+    late final StreamController<bool> controller;
+    StreamSubscription<User?>? firebaseSub;
+
+    controller = StreamController<bool>(
+      onListen: () {
+        // Subscribe first so we don't miss a fast auth event.
+        firebaseSub = _firebaseAuth.authStateChanges().listen((user) async {
+          if (user != null) {
+            debugPrint(
+              '[AuthService] appAuthStateChanges emit=true (firebase user uid=${user.uid})',
+            );
+            controller.add(true);
+            return;
+          }
+
+          final jwt = await TokenService.getJwt();
+          final isJwtAuth = jwt != null && jwt.isNotEmpty;
+          debugPrint(
+            '[AuthService] appAuthStateChanges firebase user null, jwtPresent=$isJwtAuth -> emit=$isJwtAuth',
+          );
+          controller.add(isJwtAuth);
+        }, onError: (Object e, StackTrace st) {
+          debugPrint('[AuthService] appAuthStateChanges firebase stream error: $e');
+          controller.addError(e, st);
+        });
+
+        // Also emit an explicit initial JWT state for cold starts.
+        () async {
+          final initialJwt = await TokenService.getJwt();
+          if (initialJwt != null && initialJwt.isNotEmpty) {
+            debugPrint(
+              '[AuthService] appAuthStateChanges initial emit=true (jwt present)',
+            );
+            controller.add(true);
+          } else {
+            debugPrint('[AuthService] appAuthStateChanges initial jwt missing');
+          }
+        }();
+      },
+      onCancel: () async {
+        await firebaseSub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 }

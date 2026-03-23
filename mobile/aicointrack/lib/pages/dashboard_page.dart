@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config/theme.dart';
 import '../providers/theme_provider.dart';
+import '../services/api_service.dart';
+import '../services/pending_transactions_service.dart';
 import 'budget_page.dart';
+import 'pending_transactions_page.dart';
 import 'transactions_page.dart';
 import 'shopping_pages.dart';
 import 'savings_closeout_pages.dart';
 import '../services/auth_service.dart';
 import 'login_page.dart';
+import 'settings_page.dart';
+import '../utils/formatters.dart';
 
 class DashboardPage extends StatefulWidget {
   final String userName;
@@ -29,6 +34,69 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   int _currentNavIndex = 0;
+  Map<String, dynamic> _summary = {};
+  bool _summaryLoading = true;
+  String? _summaryError;
+  List<dynamic> _budgetCategories = [];
+  List<dynamic> _recentTransactions = [];
+  List<dynamic> _shoppingLists = [];
+  List<dynamic> _savingsGoals = [];
+
+  void _setNavIndex(int index) {
+    if (!mounted) return;
+    setState(() {
+      _currentNavIndex = index;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    if (mounted) {
+      setState(() {
+        _summaryLoading = true;
+        _summaryError = null;
+      });
+    }
+
+    try {
+      final results = await Future.wait<dynamic>([
+        ApiService.fetchDashboardSummaryFromApi(),
+        ApiService.fetchWalletBalance(),
+      ]);
+      final summary = {
+        ...(results[0] as Map<String, dynamic>),
+        ...(results[1] as Map<String, dynamic>),
+      };
+      final detailResults = await Future.wait<dynamic>([
+        ApiService.fetchCurrentBudget(),
+        ApiService.fetchTransactions(limit: 3),
+        ApiService.fetchShoppingListsFromApi(),
+        ApiService.fetchSavingsGoalsFromApi(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _summary = summary;
+          _budgetCategories = detailResults[0] as List<dynamic>;
+          _recentTransactions = detailResults[1] as List<dynamic>;
+          _shoppingLists = detailResults[2] as List<dynamic>;
+          _savingsGoals = detailResults[3] as List<dynamic>;
+          _summaryLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _summaryError = e.toString().replaceFirst('Exception: ', '');
+          _summaryLoading = false;
+        });
+      }
+    }
+  }
 
   Future<void> _handleLogout() async {
     final shouldLogout = await showDialog<bool>(
@@ -43,9 +111,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.danger,
-            ),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
             child: const Text('Sign Out'),
           ),
         ],
@@ -62,9 +128,9 @@ class _DashboardPageState extends State<DashboardPage> {
           );
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error signing out: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
       }
     }
   }
@@ -89,7 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [AppColors.accentGreen, AppColors.purple],
+                      colors: [AppColors.accent, AppColors.purple],
                     ),
                   ),
                   child: Center(
@@ -100,7 +166,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: Colors.black,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -137,27 +203,25 @@ class _DashboardPageState extends State<DashboardPage> {
               title: const Text('Account & app settings'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('Settings screen coming soon (placeholder only).'),
-                  ),
-                );
+                Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const SettingsPage()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.palette_outlined),
               title: const Text('Theme'),
-              subtitle: Text(
-                isDark ? 'Dark' : 'Light',
-              ),
+              subtitle: Text(isDark ? 'Dark' : 'Light'),
               trailing: Switch(
                 value: isDark,
                 onChanged: (value) {
-                  Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+                  Provider.of<ThemeProvider>(
+                    context,
+                    listen: false,
+                  ).toggleTheme();
                   Navigator.pop(context);
                 },
-                activeColor: AppColors.accentGreen,
+                activeColor: AppColors.accent,
               ),
             ),
             const Divider(),
@@ -221,7 +285,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [AppColors.accentGreen, AppColors.purple],
+                  colors: [AppColors.accent, AppColors.purple],
                 ),
               ),
               child: Center(
@@ -243,45 +307,48 @@ class _DashboardPageState extends State<DashboardPage> {
         elevation: 0,
         actions: [
           // Notifications icon with badge
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined),
-                onPressed: () {
-                  // TODO: Implement notifications page
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Notifications coming soon'),
+          ValueListenableBuilder<int>(
+            valueListenable: pendingCountNotifier,
+            builder: (context, count, child) {
+              return Stack(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.notifications_outlined),
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PendingTransactionsPage(),
+                      ),
                     ),
-                  );
-                },
-              ),
-              // Notification badge
-              Positioned(
-                right: 8,
-                top: 8,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: AppColors.danger,
-                    shape: BoxShape.circle,
                   ),
-                  constraints: const BoxConstraints(
-                    minWidth: 16,
-                    minHeight: 16,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                  if (count > 0)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.danger,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           // Search icon
           IconButton(
@@ -289,9 +356,7 @@ class _DashboardPageState extends State<DashboardPage> {
             onPressed: () {
               // TODO: Implement search functionality
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Search coming soon'),
-                ),
+                const SnackBar(content: Text('Search coming soon')),
               );
             },
           ),
@@ -307,7 +372,12 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
       body: body,
-      bottomNavigationBar: _buildBottomNavBar(cardColor, borderColor, textColor, mutedColor),
+      bottomNavigationBar: _buildBottomNavBar(
+        cardColor,
+        borderColor,
+        textColor,
+        mutedColor,
+      ),
     );
   }
 
@@ -336,32 +406,34 @@ class _DashboardPageState extends State<DashboardPage> {
     Color textColor,
     Color mutedColor,
     Color cardColor,
-    Color borderColor,
-    {Color? lightCardBg, Color? lightCardText}
-  ) {
+    Color borderColor, {
+    Color? lightCardBg,
+    Color? lightCardText,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = isDark ? cardColor : (lightCardBg ?? cardColor);
     final textCol = isDark ? textColor : (lightCardText ?? textColor);
     final mutedCol = isDark ? mutedColor : (lightCardText ?? mutedColor);
-    
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: bgColor,
-        border: Border.all(color: isDark ? borderColor : Colors.transparent),
+        border: isDark
+            ? Border(
+                left: BorderSide(
+                  color: AppColors.accent.withOpacity(0.4),
+                  width: 3,
+                ),
+              )
+            : Border.all(color: Colors.transparent),
       ),
       padding: EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: mutedCol,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 11, color: mutedCol)),
           Text(
             value,
             style: TextStyle(
@@ -375,120 +447,227 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget _buildSkeletonBox({
+    double height = 18,
+    double? width,
+    double radius = 10,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(
+        color: (isDark ? AppColors.darkBorder : AppColors.lightBorder)
+            .withOpacity(0.8),
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+
+  double _budgetTotalPlanned() {
+    return _budgetCategories.fold<double>(0.0, (sum, item) {
+      final category = Map<String, dynamic>.from(item as Map);
+      return sum + ((category['planned'] ?? 0) as num).toDouble();
+    });
+  }
+
+  double _budgetTotalActual() {
+    return _budgetCategories.fold<double>(0.0, (sum, item) {
+      final category = Map<String, dynamic>.from(item as Map);
+      return sum + ((category['actual'] ?? 0) as num).toDouble();
+    });
+  }
+
+  double _totalSaved() {
+    return _savingsGoals.fold<double>(0.0, (sum, item) {
+      final goal = Map<String, dynamic>.from(item as Map);
+      return sum + ((goal['saved'] ?? 0) as num).toDouble();
+    });
+  }
+
+  String _transactionEmoji(String source) {
+    switch (source.toLowerCase()) {
+      case 'mpesa':
+        return '📱';
+      case 'onchain':
+        return '⛓️';
+      case 'bank':
+        return '🏦';
+      case 'cash':
+      default:
+        return '💵';
+    }
+  }
+
+  String _transactionAmount(Map<String, dynamic> tx) {
+    final amount = ((tx['amount'] ?? 0) as num).toDouble();
+    final type = (tx['transaction_type'] ?? 'expense').toString().toLowerCase();
+    return '${type == 'income' ? '+' : '-'}${Formatters.formatKes(amount)}';
+  }
+
+  Color _transactionColor(Map<String, dynamic> tx) {
+    final type = (tx['transaction_type'] ?? 'expense').toString().toLowerCase();
+    return type == 'income' ? AppColors.positive : AppColors.danger;
+  }
+
+  String _buildInsight(List categories) {
+    final sorted =
+        categories
+            .where(
+              (c) => ((c['actual'] ?? 0) as num) > ((c['planned'] ?? 0) as num),
+            )
+            .toList()
+          ..sort((a, b) {
+            final aDiff =
+                (((a['actual'] ?? 0) as num) - ((a['planned'] ?? 0) as num))
+                    .toDouble();
+            final bDiff =
+                (((b['actual'] ?? 0) as num) - ((b['planned'] ?? 0) as num))
+                    .toDouble();
+            return bDiff.compareTo(aDiff);
+          });
+
+    if (sorted.isEmpty) {
+      return "You're on track this month! Great work staying within budget.";
+    }
+
+    final worst = Map<String, dynamic>.from(sorted.first as Map);
+    final overBy =
+        ((((worst['actual'] ?? 0) as num) - ((worst['planned'] ?? 0) as num))
+            .toDouble());
+    return "You're on track this month! ${worst['label']} spending is over budget by ${Formatters.formatKes(overBy)}. Consider reducing spending in this category.";
+  }
+
   List<Widget> _buildRecentTransactions(
     Color textColor,
     Color mutedColor,
     Color borderColor,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final transactions = [
-      {
-        'desc': 'Uber – CBD to Westlands',
-        'cat': '🚗 Transport',
-        'amt': '-Ksh 350',
-        'source': 'auto'
-      },
-      {
-        'desc': 'Quickmart Supermarket',
-        'cat': '🛒 Food',
-        'amt': '-Ksh 1,840',
-        'source': 'auto'
-      },
-      {
-        'desc': 'MiniSend – Received',
-        'cat': '💸 Income',
-        'amt': '+Ksh 5,000',
-        'source': 'chain'
-      },
-    ];
+    if (_summaryLoading) {
+      return [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: isDark ? AppColors.darkCard : AppColors.lightCardWhite,
+            border: Border.all(
+              color: isDark ? borderColor : Colors.transparent,
+            ),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: List.generate(
+              3,
+              (_) => Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  children: [
+                    _buildSkeletonBox(height: 36, width: 36),
+                    const SizedBox(width: 10),
+                    Expanded(child: _buildSkeletonBox(height: 14)),
+                    const SizedBox(width: 10),
+                    _buildSkeletonBox(height: 14, width: 60),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ];
+    }
 
-    final transactionWidgets = transactions
-        .map(
-          (t) => Column(
+    final transactionWidgets = _recentTransactions.map((raw) {
+      final t = Map<String, dynamic>.from(raw as Map);
+      final source = (t['source'] ?? '').toString();
+      final isAutoLogged = source != 'onchain' && source != 'cash';
+      return Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: borderColor),
-                            color: isDark
-                                ? AppColors.darkCard
-                                : AppColors.lightCardBlack,
-                          ),
-                          child: Center(
-                            child: Text(
-                              t['cat'].toString().split(' ')[0],
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: borderColor),
+                        color: isDark
+                            ? AppColors.darkCard
+                            : AppColors.lightCardBlack,
+                      ),
+                      child: Center(
+                        child: Text(
+                          _transactionEmoji(source),
+                          style: TextStyle(fontSize: 16),
                         ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (t['description'] ?? 'Transaction').toString(),
+                            style: TextStyle(fontSize: 13, color: textColor),
+                          ),
+                          SizedBox(height: 4),
+                          Row(
                             children: [
                               Text(
-                                t['desc'].toString(),
+                                Formatters.formatDate(
+                                  t['created_at']?.toString(),
+                                ),
                                 style: TextStyle(
-                                  fontSize: 13,
-                                  color: textColor,
+                                  fontSize: 11,
+                                  color: mutedColor,
                                 ),
                               ),
-                              SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    t['cat'].toString().split(' ').skip(1).join(' '),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: mutedColor,
-                                    ),
+                              if (isAutoLogged)
+                                Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: _buildPillSmall('Auto-logged'),
+                                ),
+                              if (source == 'onchain')
+                                Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: _buildPillSmall(
+                                    'Onchain',
+                                    AppColors.accent,
                                   ),
-                                  if (t['source'] == 'auto')
-                                    Padding(
-                                      padding: EdgeInsets.only(left: 6),
-                                      child: _buildPillSmall('Auto-logged'),
-                                    ),
-                                  if (t['source'] == 'chain')
-                                    Padding(
-                                      padding: EdgeInsets.only(left: 6),
-                                      child: _buildPillSmall('Onchain',
-                                          AppColors.accentGreen),
-                                    ),
-                                ],
-                              ),
+                                ),
+                              if (source == 'cash')
+                                Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: _buildPillSmall('Manual'),
+                                ),
                             ],
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  Text(
-                    t['amt'].toString(),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: t['amt'].toString().startsWith('+')
-                          ? AppColors.accentGreen
-                          : AppColors.danger,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              SizedBox(height: 10),
-              Divider(height: 1, color: borderColor),
-              SizedBox(height: 10),
+              Text(
+                _transactionAmount(t),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _transactionColor(t),
+                ),
+              ),
             ],
           ),
-        )
-        .toList();
+          SizedBox(height: 10),
+          Divider(height: 1, color: borderColor),
+          SizedBox(height: 10),
+        ],
+      );
+    }).toList();
 
     // Wrap transactions in a card container
     return [
@@ -496,14 +675,10 @@ class _DashboardPageState extends State<DashboardPage> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           color: isDark ? AppColors.darkCard : AppColors.lightCardWhite,
-          border: Border.all(
-            color: isDark ? borderColor : Colors.transparent,
-          ),
+          border: Border.all(color: isDark ? borderColor : Colors.transparent),
         ),
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: transactionWidgets,
-        ),
+        child: Column(children: transactionWidgets),
       ),
     ];
   }
@@ -523,10 +698,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontSize: 9,
-          color: color ?? textColorSmall,
-        ),
+        style: TextStyle(fontSize: 9, color: color ?? textColorSmall),
       ),
     );
   }
@@ -547,9 +719,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     return Container(
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: borderColor),
-        ),
+        border: Border(top: BorderSide(color: borderColor)),
         color: cardColor,
       ),
       padding: EdgeInsets.only(bottom: 20, top: 10),
@@ -558,25 +728,21 @@ class _DashboardPageState extends State<DashboardPage> {
         children: navItems
             .map(
               (item) => GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _currentNavIndex = item['id'] as int;
-                  });
-                },
+                onTap: () => _setNavIndex(item['id'] as int),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       item['icon'].toString(),
-                      style: TextStyle(fontSize: 18),
+                      style: const TextStyle(fontSize: 18),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       item['label'].toString(),
                       style: TextStyle(
                         fontSize: 9,
                         color: _currentNavIndex == item['id']
-                            ? AppColors.accentGreen
+                            ? AppColors.accent
                             : mutedColor,
                       ),
                     ),
@@ -596,6 +762,42 @@ class _DashboardPageState extends State<DashboardPage> {
     required Color textColor,
     required Color mutedColor,
   }) {
+    if (_summaryError != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              _summaryError!,
+              style: TextStyle(color: mutedColor, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadDashboardData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final totalBudget = _budgetTotalPlanned();
+    final totalActual = _budgetTotalActual();
+    final freeToSpend =
+        ((_summary['freeToSpend'] ?? _summary['balance'] ?? 0) as num)
+            .toDouble();
+    final variance = ((_summary['variance'] ?? 0) as num).toDouble();
+    final monthProgress = ((_summary['monthProgress'] ?? 0) as num).toDouble();
+    final totalSaved = _totalSaved();
+    final insight = _buildInsight(
+      _budgetCategories.cast<Map<String, dynamic>>(),
+    );
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final heroTextColor = isDark ? AppColors.darkText : Colors.white;
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.only(bottom: 80),
@@ -612,10 +814,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       Text(
                         'Good morning,',
-                        style: TextStyle(
-                          color: mutedColor,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: mutedColor, fontSize: 12),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -628,7 +827,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ],
                   ),
-
                 ],
               ),
               const SizedBox(height: 20),
@@ -636,18 +834,17 @@ class _DashboardPageState extends State<DashboardPage> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
                   gradient: LinearGradient(
-                    colors: bgColor == AppColors.darkBg
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
                         ? [
-                            AppColors.purple.withOpacity(0.13),
-                            AppColors.accentGreen.withOpacity(0.07),
+                            AppColors.accent.withOpacity(0.15),
+                            AppColors.purple.withOpacity(0.08),
                           ]
-                        : [
-                            AppColors.accentGreen,
-                            AppColors.purple,
-                          ],
+                        : [AppColors.accent, AppColors.accentDim],
                   ),
                   border: Border.all(
-                    color: bgColor == AppColors.darkBg
+                    color: isDark
                         ? AppColors.purple.withOpacity(0.27)
                         : Colors.transparent,
                   ),
@@ -660,38 +857,40 @@ class _DashboardPageState extends State<DashboardPage> {
                       'FREE TO SPEND',
                       style: TextStyle(
                         fontSize: 12,
-                        color: bgColor == AppColors.darkBg
-                            ? mutedColor
-                            : Colors.white.withOpacity(0.85),
+                        color: isDark
+                            ? heroTextColor.withOpacity(0.85)
+                            : heroTextColor.withOpacity(0.85),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Ksh 24,500',
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
+                    _summaryLoading
+                        ? _buildSkeletonBox(height: 36, width: 180, radius: 12)
+                        : Text(
+                            Formatters.formatKes(freeToSpend),
+                            style: TextStyle(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w800,
+                              color: heroTextColor,
+                            ),
+                          ),
                     const SizedBox(height: 8),
-                    _buildPill(
-                      '✓ +Ksh 2,300 vs last month',
-                      AppColors.lightCardWhite,
-                    ),
+                    _summaryLoading
+                        ? _buildSkeletonBox(height: 28, width: 180, radius: 999)
+                        : _buildPill(
+                            '✓ ${variance >= 0 ? '+' : '-'}${Formatters.formatKes(variance.abs())} vs last month',
+                            AppColors.lightCardWhite,
+                          ),
                     const SizedBox(height: 14),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           'Month progress',
-                          style:
-                              TextStyle(fontSize: 12, color: mutedColor),
+                          style: TextStyle(fontSize: 12, color: heroTextColor),
                         ),
                         Text(
                           'March 8 / 31',
-                          style:
-                              TextStyle(fontSize: 12, color: mutedColor),
+                          style: TextStyle(fontSize: 12, color: heroTextColor),
                         ),
                       ],
                     ),
@@ -699,12 +898,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(99),
                       child: LinearProgressIndicator(
-                        value: 0.26,
+                        value: _summaryLoading ? 0.0 : monthProgress,
                         minHeight: 4,
                         backgroundColor: borderColor,
-                        valueColor:
-                            const AlwaysStoppedAnimation<Color>(
-                          AppColors.accentGreen,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppColors.accent,
                         ),
                       ),
                     ),
@@ -720,46 +918,54 @@ class _DashboardPageState extends State<DashboardPage> {
                 mainAxisSpacing: 10,
                 childAspectRatio: 1.2,
                 children: [
-                  _buildStatCard(
-                    'Total Budget',
-                    'Ksh 85,000',
-                    textColor,
-                    mutedColor,
-                    cardColor,
-                    borderColor,
-                    lightCardBg: AppColors.lightCardBlue,
-                    lightCardText: AppColors.cardBlueText,
-                  ),
-                  _buildStatCard(
-                    'Spent So Far',
-                    'Ksh 60,500',
-                    textColor,
-                    mutedColor,
-                    cardColor,
-                    borderColor,
-                    lightCardBg: AppColors.lightCardGold,
-                    lightCardText: AppColors.cardGoldText,
-                  ),
-                  _buildStatCard(
-                    'Saved',
-                    'Ksh 17,000',
-                    AppColors.accentGreen,
-                    mutedColor,
-                    cardColor,
-                    borderColor,
-                    lightCardBg: AppColors.lightCardGreen,
-                    lightCardText: AppColors.cardGreenText,
-                  ),
-                  _buildStatCard(
-                    'Shopping',
-                    '3 lists',
-                    textColor,
-                    mutedColor,
-                    cardColor,
-                    borderColor,
-                    lightCardBg: AppColors.lightCardPurple,
-                    lightCardText: AppColors.cardPurpleText,
-                  ),
+                  _summaryLoading
+                      ? _buildSkeletonBox(height: 120, radius: 16)
+                      : _buildStatCard(
+                          'Total Budget',
+                          Formatters.formatKes(totalBudget),
+                          textColor,
+                          mutedColor,
+                          cardColor,
+                          borderColor,
+                          lightCardBg: AppColors.lightCardBlue,
+                          lightCardText: AppColors.cardBlueText,
+                        ),
+                  _summaryLoading
+                      ? _buildSkeletonBox(height: 120, radius: 16)
+                      : _buildStatCard(
+                          'Spent So Far',
+                          Formatters.formatKes(totalActual),
+                          textColor,
+                          mutedColor,
+                          cardColor,
+                          borderColor,
+                          lightCardBg: AppColors.lightCardGold,
+                          lightCardText: AppColors.cardGoldText,
+                        ),
+                  _summaryLoading
+                      ? _buildSkeletonBox(height: 120, radius: 16)
+                      : _buildStatCard(
+                          'Saved',
+                          Formatters.formatKes(totalSaved),
+                          AppColors.accent,
+                          mutedColor,
+                          cardColor,
+                          borderColor,
+                          lightCardBg: AppColors.lightCardGreen,
+                          lightCardText: AppColors.cardGreenText,
+                        ),
+                  _summaryLoading
+                      ? _buildSkeletonBox(height: 120, radius: 16)
+                      : _buildStatCard(
+                          'Shopping',
+                          '${_shoppingLists.length} lists',
+                          textColor,
+                          mutedColor,
+                          cardColor,
+                          borderColor,
+                          lightCardBg: AppColors.lightCardPurple,
+                          lightCardText: AppColors.cardPurpleText,
+                        ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -790,29 +996,23 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    RichText(
-                      text: TextSpan(
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.5,
-                          color: textColor,
-                        ),
-                        children: const [
-                          TextSpan(
-                            text:
-                                "You're on track this month! Food spending is ",
+                    _summaryLoading
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildSkeletonBox(height: 14),
+                              const SizedBox(height: 6),
+                              _buildSkeletonBox(height: 14, width: 220),
+                            ],
+                          )
+                        : Text(
+                            insight,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.5,
+                              color: textColor,
+                            ),
                           ),
-                          TextSpan(
-                            text: '18% over budget',
-                            style: TextStyle(color: AppColors.warning),
-                          ),
-                          TextSpan(
-                            text:
-                                '. Reduce dining out by Ksh 800 to stay in the green.',
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -826,11 +1026,34 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               const SizedBox(height: 10),
-              ..._buildRecentTransactions(
-                textColor,
-                mutedColor,
-                borderColor,
-              ),
+              if (!_summaryLoading && _recentTransactions.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    color: bgColor == AppColors.darkBg
+                        ? AppColors.darkCard
+                        : AppColors.lightCardWhite,
+                    border: Border.all(
+                      color: bgColor == AppColors.darkBg
+                          ? borderColor
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text('💸', style: TextStyle(fontSize: 32)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No transactions yet',
+                        style: TextStyle(color: mutedColor, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ..._buildRecentTransactions(textColor, mutedColor, borderColor),
             ],
           ),
         ),

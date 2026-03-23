@@ -24,9 +24,9 @@ export default function ShoppingListCard({ list }: ShoppingListCardProps) {
   const percentUsed = (totalSpent / list.budget) * 100
 
   const getStatusColor = () => {
-    if (percentUsed >= 100) return "#EF4444"
+    if (percentUsed >= 100) return colors.red
     if (percentUsed >= 80) return "#F59E0B"
-    return colors.green
+    return colors.positive
   }
 
   return (
@@ -105,7 +105,7 @@ export default function ShoppingListCard({ list }: ShoppingListCardProps) {
           style={{
             marginTop: 8,
             fontSize: 12,
-            color: "#EF4444",
+            color: colors.red,
             fontWeight: 600,
           }}
         >

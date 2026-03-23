@@ -3,9 +3,8 @@ import { useState } from "react"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
-import AmountInput from "@/components/ui/AmountInput"
 import { useGoals } from "@/hooks/useGoals"
-import { contributeToGoal, recordOnchainTx } from "@/lib/api"
+import { contributeToGoal } from "@/lib/api"
 
 interface Goal {
   id: string
@@ -45,18 +44,10 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
     try {
       const usdcAmount = parseFloat(amount)
 
-      const txHash = "0x" + Math.random().toString(16).substring(2, 18)
-
+      // Record contribution in backend
       await contributeToGoal(selectedGoal, {
         amount_usdc: usdcAmount,
-        tx_hash: txHash,
-      })
-
-      await recordOnchainTx({
-        tx_hash: txHash,
-        amount_usdc: usdcAmount,
-        note: `Saved to goal`,
-        category: "savings",
+        tx_hash: "0x" + Math.random().toString(16).substring(2, 18),
       })
 
       await refetch()
@@ -103,45 +94,63 @@ export default function SaveSheet({ isOpen, onClose }: SaveSheetProps) {
             }}
           >
             <option value="">Choose a savings goal...</option>
-            {goals.map((goal: Goal) => {
-              const current = goal.saved ?? goal.current_amount ?? 0
-              const target = goal.target ?? goal.target_amount ?? 0
-              return (
-                <option key={goal.id} value={goal.id}>
-                  {goal.name} - ${Number(current).toFixed(2)} / ${Number(target).toFixed(2)}
-                </option>
-              )
-            })}
+            {goals.map((goal: Goal) => (
+              <option key={goal.id} value={goal.id}>
+                {goal.name} - ${goal.saved || goal.current_amount || 0} / ${goal.target || goal.target_amount || 0}
+              </option>
+            ))}
           </select>
         </div>
 
-        <AmountInput
-          value={amount}
-          onChange={setAmount}
-          label="Amount to Save"
-        />
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              color: colors.mid,
+              marginBottom: 6,
+              fontFamily: "Syne, sans-serif",
+              fontWeight: 700,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            Amount (USDC)
+          </div>
+          <input
+            type="number"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+            placeholder="0.00"
+            style={{
+              background: theme === "light" ? colors.bg2 : colors.card,
+              border: `1.5px solid ${colors.border}`,
+              borderRadius: 12,
+              padding: "12px 16px",
+              color: colors.text,
+              fontSize: 14,
+              width: "100%",
+              outline: "none",
+            }}
+          />
+        </div>
 
         {error && (
-          <div style={{ color: colors.red, fontSize: 13, textAlign: "center" }}>
-            {error}
-          </div>
+          <div style={{ color: colors.red, fontSize: 13 }}>{error}</div>
         )}
 
         <button
           onClick={handleSave}
-          disabled={loading}
+          disabled={loading || !selectedGoal || !amount}
           style={{
-            background: theme === "light" ? colors.green : colors.accent,
-            color: theme === "light" ? "#fff" : "#000",
-            fontFamily: "Syne, sans-serif",
-            fontWeight: 700,
+            padding: "14px 20px",
+            borderRadius: 12,
             border: "none",
-            borderRadius: 14,
-            padding: "14px 28px",
-            cursor: loading ? "not-allowed" : "pointer",
+            background: loading || !selectedGoal || !amount ? colors.muted : colors.accent,
+            color: "#fff",
             fontSize: 14,
-            width: "100%",
-            opacity: loading ? 0.6 : 1,
+            fontWeight: 700,
+            cursor: loading || !selectedGoal || !amount ? "not-allowed" : "pointer",
+            opacity: loading || !selectedGoal || !amount ? 0.6 : 1,
           }}
         >
           {loading ? "Processing..." : "Save"}

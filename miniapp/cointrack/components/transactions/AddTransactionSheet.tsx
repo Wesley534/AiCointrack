@@ -110,10 +110,10 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
               style={{
                 flex: 1,
                 background: type === "income" 
-                  ? (theme === "light" ? colors.green : colors.accent)
+                  ? colors.accent
                   : (theme === "light" ? colors.bg2 : colors.card),
                 color: type === "income"
-                  ? (theme === "light" ? "#fff" : "#000")
+                  ? "#fff"
                   : colors.mid,
                 border: `1.5px solid ${colors.border}`,
                 borderRadius: 10,
@@ -249,8 +249,8 @@ export default function AddTransactionSheet({ isOpen, onClose, onSuccess }: AddT
           onClick={handleSubmit}
           disabled={loading}
           style={{
-            background: theme === "light" ? colors.green : colors.accent,
-            color: theme === "light" ? "#fff" : "#000",
+            background: colors.accent,
+            color: "#fff",
             fontFamily: "Syne, sans-serif",
             fontWeight: 700,
             border: "none",
