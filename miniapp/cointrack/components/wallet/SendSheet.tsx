@@ -51,6 +51,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
     setLoading(true)
     setError("")
     setStep("idle")
+    let broadcastedHash: string | undefined
 
     try {
       if (mode === "onchain") {
@@ -59,6 +60,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         // Step 1: Send real USDC on Base Sepolia
         setStep("sending")
         const txHash = await sendUsdc(config, recipient, usdcAmount)
+        broadcastedHash = txHash
 
         // Step 2: Canonical data for fingerprint
         const canonicalData = {
@@ -88,7 +90,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
               setStep("storing")
               const fingerprint = await withTimeout(
                 storeHashOnChain(config, user.id, savedTx.id, canonicalData),
-                15_000
+                120_000
               )
               console.log("On-chain fingerprint stored:", fingerprint)
               console.log("View on explorer: https://sepolia.basescan.org/tx/" + txHash)
@@ -126,8 +128,18 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         onClose()
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Transaction failed"
-      if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // Treat timeouts as latency rather than hard failures when tx was broadcast
+      if (msg.toLowerCase().includes("timed out") || msg.toLowerCase().includes("timeout")) {
+        if (broadcastedHash) {
+          setError("Transaction is taking longer than expected. It was broadcast; check explorer for status.")
+          setLoading(false)
+          setStep("idle")
+          onClose()
+        } else {
+          setError("Transaction timed out before broadcasting. Tap Send to try again.")
+        }
+      } else if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
         setError("Transaction cancelled. Tap Send to try again.")
       } else {
         setError(msg)

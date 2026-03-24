@@ -66,7 +66,9 @@ export async function sendUsdc(
   await waitForTransactionReceipt(config, {
     hash,
     confirmations: 1,
-    timeout: 30_000,
+    timeout: 120_000,
+    pollingInterval: 10_000,
+    retryCount: 10,
   })
 
   return hash
@@ -101,7 +103,9 @@ export async function storeHashOnChain(
   await waitForTransactionReceipt(config, {
     hash,
     confirmations: 1,
-    timeout: 30_000,
+    timeout: 120_000,
+    pollingInterval: 10_000,
+    retryCount: 10,
   })
 
   return fingerprint
