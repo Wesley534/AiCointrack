@@ -134,7 +134,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
       }
     } finally {
       setLoading(false)
-      setStep("done")
+      setStep("idle")
     }
   }
 
