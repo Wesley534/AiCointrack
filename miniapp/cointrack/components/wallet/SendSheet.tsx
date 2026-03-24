@@ -8,6 +8,14 @@ import AmountInput from "@/components/ui/AmountInput"
 import { recordOnchainTx, recordOffchainTx, updateTransactionFingerprint } from "@/lib/api"
 import { sendUsdc, storeHashOnChain } from "@/lib/wagmi"
 
+// Helper: wrap a promise with a timeout (rejects after `ms`)
+function withTimeout<T>(p: Promise<T>, ms: number) {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Operation timed out")), ms)),
+  ])
+}
+
 interface SendSheetProps {
   isOpen: boolean
   onClose: () => void
@@ -72,25 +80,34 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           transaction_type: "expense",
         })
 
-        // Step 4: Store fingerprint on HashStore contract (non-fatal)
+        // Schedule fingerprinting in the background (non-blocking).
+        // Use a timeout so the UI can't hang indefinitely if RPC/backend stalls.
         if (user?.id && savedTx?.id) {
-          try {
-            setStep("storing")
-            const fingerprint = await storeHashOnChain(
-              config,
-              user.id,
-              savedTx.id,
-              canonicalData
-            )
-            console.log("On-chain fingerprint stored:", fingerprint)
-            console.log("View on explorer: https://sepolia.basescan.org/tx/" + txHash)
+          ;(async () => {
+            try {
+              setStep("storing")
+              const fingerprint = await withTimeout(
+                storeHashOnChain(config, user.id, savedTx.id, canonicalData),
+                15_000
+              )
+              console.log("On-chain fingerprint stored:", fingerprint)
+              console.log("View on explorer: https://sepolia.basescan.org/tx/" + txHash)
 
-            // Step 5: Update backend with the fingerprint
-            await updateTransactionFingerprint(savedTx.id, fingerprint, txHash)
-          } catch (hashErr) {
-            console.warn("Hash storage failed (non-fatal):", hashErr)
-          }
+              // Update backend with the fingerprint (best-effort)
+              await updateTransactionFingerprint(savedTx.id, fingerprint, txHash)
+            } catch (hashErr) {
+              console.warn("Hash storage failed (non-fatal):", hashErr)
+            } finally {
+              setStep("idle")
+            }
+          })()
         }
+
+        // Close the sheet and clear inputs immediately after the critical onchain steps
+        setRecipient("")
+        setAmount("")
+        setDescription("")
+        onClose()
       } else {
         const txAmount = parseFloat(amount)
         await recordOffchainTx({
@@ -101,12 +118,13 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           currency: "KES",
           transaction_type: "expense",
         })
-      }
 
-      setRecipient("")
-      setAmount("")
-      setDescription("")
-      onClose()
+        // Close sheet immediately after offchain record succeeds
+        setRecipient("")
+        setAmount("")
+        setDescription("")
+        onClose()
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Transaction failed"
       if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
