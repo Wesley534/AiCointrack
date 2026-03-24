@@ -1,7 +1,7 @@
 "use client";
 import { ReactNode, useState } from "react";
 import { baseSepolia } from "wagmi/chains";
-import { WagmiProvider, createConfig, http } from "wagmi";
+import { WagmiProvider, createConfig, http, fallback } from "wagmi";
 import { Attribution } from "@/lib/attribution";
 import { coinbaseWallet } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,7 +12,13 @@ const DATA_SUFFIX: { value: `0x${string}` } = {
 
 const wagmiConfig = createConfig({
   chains: [baseSepolia],
-  transports: { [baseSepolia.id]: http() },
+  transports: {
+    [baseSepolia.id]: fallback([
+      http("https://sepolia.base.org"),
+      http("https://base-sepolia-rpc.publicnode.com"),
+      http(),
+    ]),
+  },
   dataSuffix: DATA_SUFFIX,
   connectors: [
     coinbaseWallet({
