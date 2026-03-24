@@ -7,6 +7,7 @@ import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
 import { recordOnchainTx, recordOffchainTx, updateTransactionFingerprint } from "@/lib/api"
 import { sendUsdc, storeHashOnChain } from "@/lib/wagmi"
+import { payWithBase, getBasePaymentStatus, BasePaymentStatus, BasePaymentResult } from "@/lib/basePay"
 
 // Helper: wrap a promise with a timeout (rejects after `ms`)
 function withTimeout<T>(p: Promise<T>, ms: number) {
@@ -57,10 +58,33 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
       if (mode === "onchain") {
         const usdcAmount = parseFloat(amount)
 
-        // Step 1: Send real USDC on Base Sepolia
+        // Step 1: Send real USDC on Base Sepolia (prefer Base Pay SDK)
         setStep("sending")
-        const txHash = await sendUsdc(config, recipient, usdcAmount)
-        broadcastedHash = txHash
+        const baseSdkAvailable = typeof window !== "undefined" && ((window as unknown as Window & { base?: unknown }).base !== undefined)
+        if (baseSdkAvailable) {
+          // Use Base Pay SDK which accepts USD strings (quotes USDC) and handles wallet UX
+          const amountStr = Number(usdcAmount).toFixed(2)
+          const payment = await payWithBase(amountStr, recipient, true) as BasePaymentResult
+          const paymentId = payment?.id
+
+          // Poll for completion (short timeout) so we can record onchain tx details
+          const timeoutMs = 120_000
+          const start = Date.now()
+          let status: BasePaymentStatus | null = null
+          if (paymentId) {
+            while (Date.now() - start < timeoutMs) {
+              status = await getBasePaymentStatus(paymentId, true)
+              if (status?.status === "completed") break
+              await new Promise(r => setTimeout(r, 2000))
+            }
+          }
+
+          // Prefer the on-chain transaction hash if available, otherwise fall back to payment id
+          broadcastedHash = (status && status.transactionHash) ? String(status.transactionHash) : paymentId
+        } else {
+          const txHash = await sendUsdc(config, recipient, usdcAmount)
+          broadcastedHash = txHash
+        }
 
         // Step 2: Canonical data for fingerprint
         const canonicalData = {
@@ -73,6 +97,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         }
 
         // Step 3: Record in backend DB to get tx id
+        const txHash = broadcastedHash ?? ""
         const { data: savedTx } = await recordOnchainTx({
           tx_hash: txHash,
           amount_usdc: usdcAmount,
