@@ -1,13 +1,17 @@
-// Base mainnet
-export const BASE_CHAIN_ID = 8453
+// Base Sepolia testnet
+// Chain ID for Base Sepolia (matches wagmi config in rootProvider/loginProvider)
+export const BASE_CHAIN_ID = 84532
 
-// USDC on Base mainnet
-export const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+// Base Sepolia USDC (Circle's official test USDC on Base Sepolia)
+// Faucet: https://faucet.circle.com (select Base Sepolia)
+export const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 
 // Your deployed PocketPal vault contract (add this after you deploy)
 export const VAULT_CONTRACT_ADDRESS = ""
 
 // HashStore contract address for onchain fingerprint storage (set after deployment)
+// HashStore contract address for onchain fingerprint storage (set after deployment)
+// Leave empty for now if not deployed — Send flow records to DB first.
 export const HASH_STORE_ADDRESS = "" as `0x${string}`
 
 // Your FastAPI backend — set NEXT_PUBLIC_API_URL in .env.local
