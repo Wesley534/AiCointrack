@@ -35,6 +35,9 @@ class Transaction(Base):
     # For onchain transactions
     tx_hash = Column(String(255), nullable=True)
     recipient = Column(String(255), nullable=True)  # For onchain sends
+    onchain_hash = Column(String(66), nullable=True, index=True)
+    hash_store_tx = Column(String(66), nullable=True)
+    fingerprint_stored_at = Column(DateTime, nullable=True)
     
     # For offchain transactions (MPESA, cash, etc.)
     reference_number = Column(String(255), nullable=True)  # MPESA ref, receipt number, etc.
