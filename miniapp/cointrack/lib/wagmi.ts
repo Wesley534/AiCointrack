@@ -14,16 +14,19 @@ import {
 } from "./constants"
 import { parseUsdc } from "./format"
 
-// ── Get USDC balance ───────────────────────────────────────────────
-export async function getUsdcBalance(
-  config: Config,
-  address: string
-): Promise<bigint> {
-  return readContract(config, {
+/**
+ * Get USDC balance for an address
+ */
+export async function getUsdcBalance(config: Config, address: string): Promise<bigint> {
+  const walletAddress = address as `0x${string}`
+  console.log("USDC_ADDRESS:", USDC_ADDRESS)
+  console.log("Wallet address:", walletAddress)
+
+  const balance = await readContract(config, {
     address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
-    args: [address as `0x${string}`],
+    args: [walletAddress]
   })
 }
 

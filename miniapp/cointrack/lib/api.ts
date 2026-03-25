@@ -49,15 +49,17 @@ export const recordOnchainTx = (data: {
   amount_usdc: number
   recipient?: string
   note?: string
+  description?: string
   category?: string
+  currency?: string
   transaction_type?: "expense" | "income"
 }) => api.post("/api/v1/transactions/onchain", {
   tx_hash: data.tx_hash,
   amount: data.amount_usdc,
   recipient: data.recipient,
-  description: data.note,
+  description: data.description ?? data.note,
   category: data.category,
-  currency: "USDC",
+  currency: data.currency || "USDC",
   transaction_type: data.transaction_type ?? "expense",
 })
 

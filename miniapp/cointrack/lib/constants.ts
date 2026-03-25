@@ -1,16 +1,13 @@
-export const CONFIG = {
-  DOMAIN: "app.aicointrack.xyz",
-  URL: "https://app.aicointrack.xyz",
-  CHAIN_ID: 84532,
-} as const
+if (!process.env.NEXT_PUBLIC_USDC_ADDRESS) {
+  throw new Error("Missing NEXT_PUBLIC_USDC_ADDRESS in environment variables")
+}
 
-export const BASE_CHAIN_ID = CONFIG.CHAIN_ID
-export const APP_DOMAIN = CONFIG.DOMAIN
-export const APP_URL = CONFIG.URL
+export const USDC_ADDRESS = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`
 
-// Base Sepolia USDC (Circle's official test USDC on Base Sepolia)
-// Faucet: https://faucet.circle.com (select Base Sepolia)
-export const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+export const BASE_CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 84532)
+
+export const APP_DOMAIN = "app.aicointrack.xyz"
+export const APP_URL = "https://app.aicointrack.xyz"
 
 // Your deployed PocketPal vault contract (add this after you deploy)
 export const VAULT_CONTRACT_ADDRESS = ""
