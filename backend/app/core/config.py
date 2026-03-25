@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     BASE_RPC_URL: str
+    CHAIN_ID: int = 84532
+    FRONTEND_URL: str = "https://app.aicointrack.xyz"
     HF_API_KEY: str
 
     # Privy (embedded wallets for email/password users)

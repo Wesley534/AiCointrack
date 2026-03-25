@@ -5,7 +5,7 @@ import { useAccount, useSignMessage } from "wagmi"
 import { authenticateWallet } from "@/lib/auth"
 import { getMe } from "@/lib/api"
 import { useAppStore } from "@/store"
-import { lightTheme, darkTheme } from "@/lib/constants"
+import { BASE_CHAIN_ID, lightTheme, darkTheme } from "@/lib/constants"
 
 // Tell Base app the miniapp is ready (direct call without OnchainKit)
 function setMiniAppReady() {
@@ -83,7 +83,7 @@ export default function Page() {
       try {
         const token = await authenticateWallet(
           address!,
-          chainId || 8453,
+          chainId || BASE_CHAIN_ID,
           signMessageAsync
         )
         const userRes = await getMe()

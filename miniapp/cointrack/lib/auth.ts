@@ -1,5 +1,6 @@
 import { SiweMessage } from "siwe"
 import { getNonce, walletLogin } from "./api"
+import { APP_DOMAIN, APP_URL, BASE_CHAIN_ID } from "./constants"
 
 export async function authenticateWallet(
   address: string,
@@ -15,12 +16,12 @@ export async function authenticateWallet(
   }
 
   const message = new SiweMessage({
-    domain: typeof window !== "undefined" ? window.location.host : "app.aicointrack.xyz",
+    domain: APP_DOMAIN,
     address,
     statement: "Sign in to AiCointrack",
-    uri: typeof window !== "undefined" ? window.location.origin : "https://app.aicointrack.xyz",
+    uri: APP_URL,
     version: "1",
-    chainId,
+    chainId: chainId || BASE_CHAIN_ID,
     nonce,
   })
 

@@ -5,14 +5,14 @@
  * Exit 0 if valid, 1 if invalid.
  */
 import { createPublicClient, http } from "viem";
-import { base } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 
 const [address, message, signature] = process.argv.slice(2);
 if (!address || !message || !signature) {
   process.exit(1);
 }
 
-const client = createPublicClient({ chain: base, transport: http() });
+const client = createPublicClient({ chain: baseSepolia, transport: http() });
 
 try {
   const valid = await client.verifyMessage({ address, message, signature });

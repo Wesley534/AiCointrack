@@ -5,12 +5,12 @@ import { useAccount, useConnect, useSignMessage, useDisconnect } from "wagmi"
 import { coinbaseWallet } from "wagmi/connectors"
 import { SiweMessage } from "siwe"
 import { getNonce } from "@/lib/api"
+import { BASE_CHAIN_ID, APP_DOMAIN, APP_URL } from "@/lib/constants"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const BASE_CHAIN_ID = 8453
-const DOMAIN = "app.aicointrack.xyz"
-const ORIGIN = "https://app.aicointrack.xyz"
+const DOMAIN = APP_DOMAIN
+const ORIGIN = APP_URL
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
