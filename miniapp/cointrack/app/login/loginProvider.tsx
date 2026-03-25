@@ -23,7 +23,10 @@ const wagmiConfig = createConfig({
   connectors: [
     coinbaseWallet({
       appName: "AiCoinTrack",
-      preference: "smartWalletOnly",
+      // Workaround: backend SIWE verification may not yet support ERC-6492
+      // smart-wallet signatures reliably. Allow EOA signatures so login can
+      // complete end-to-end (deep-link + backend auth).
+      preference: "all",
     }),
   ],
 });

@@ -64,6 +64,11 @@ class BaseAuthService {
       final uri = Uri.parse(resultUrl);
       debugPrint('BaseAuth: callback uri received path=${uri.path} host=${uri.host}');
 
+      // Log lengths only (avoid flooding logs with large SIWE messages).
+      debugPrint(
+        'BaseAuth: callback url len=${resultUrl.length} queryKeys=${uri.queryParameters.keys.toList()}',
+      );
+
       final address = uri.queryParameters['address'];
       // The miniapp URL-encodes the message via URLSearchParams; Uri.parse
       // automatically percent-decodes query values for us.
@@ -74,6 +79,16 @@ class BaseAuthService {
         throw const FormatException(
           'Callback URL is missing required parameters (address / message / signature).',
         );
+      }
+
+      debugPrint(
+        'BaseAuth: parsed address=${address.substring(0, address.length.clamp(0, address.length))} '
+        'messageLen=${message.length} signatureLen=${signature.length}',
+      );
+      if (signature.isNotEmpty) {
+        final head = signature.length > 12 ? signature.substring(0, 12) : signature;
+        final tail = signature.length > 12 ? signature.substring(signature.length - 8) : '';
+        debugPrint('BaseAuth: signature head=$head tail=$tail');
       }
 
       debugPrint('✓ BaseAuth: received callback for $address');
