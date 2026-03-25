@@ -16,11 +16,59 @@ interface SendSheetProps {
 type TransactionMode = "onchain" | "offchain"
 
 const BASE_SEPOLIA_CHAIN_ID = BigInt(84532)
+const BASE_SEPOLIA_CHAIN_ID_DEC = 84532
+const BASE_SEPOLIA_CHAIN_ID_HEX = "0x14a34"
 const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
 const USDC_ABI = [
   "function transfer(address to, uint256 amount) returns (bool)",
   "function decimals() view returns (uint8)",
 ]
+
+async function ensureBaseSepolia(provider: ethers.Eip1193Provider) {
+  const getChainId = async () => {
+    const chainIdHex = await provider.request({ method: "eth_chainId" }) as string
+    return parseInt(chainIdHex, 16)
+  }
+
+  let chainId = await getChainId()
+  if (chainId === BASE_SEPOLIA_CHAIN_ID_DEC) return
+
+  try {
+    await provider.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: BASE_SEPOLIA_CHAIN_ID_HEX }],
+    })
+  } catch (switchErr) {
+    const err = switchErr as { code?: number }
+    if (err?.code === 4902) {
+      await provider.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: BASE_SEPOLIA_CHAIN_ID_HEX,
+          chainName: "Base Sepolia",
+          nativeCurrency: {
+            name: "ETH",
+            symbol: "ETH",
+            decimals: 18,
+          },
+          rpcUrls: ["https://sepolia.base.org"],
+          blockExplorerUrls: ["https://sepolia.basescan.org"],
+        }],
+      })
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: BASE_SEPOLIA_CHAIN_ID_HEX }],
+      })
+    } else {
+      throw switchErr
+    }
+  }
+
+  chainId = await getChainId()
+  if (chainId !== BASE_SEPOLIA_CHAIN_ID_DEC) {
+    throw new Error("Switch to Base Sepolia")
+  }
+}
 
 export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
   const { theme } = useAppStore()
@@ -63,16 +111,19 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           throw new Error("Enter a valid recipient address")
         }
 
-        const provider = (window as Window & { ethereum?: unknown }).ethereum
-        if (!provider) {
+        const injected = (window as Window & { ethereum?: unknown }).ethereum
+        if (!injected) {
           throw new Error("Base Wallet not found")
         }
 
-        const ethersProvider = new ethers.BrowserProvider(provider as ethers.Eip1193Provider)
+        const provider = injected as ethers.Eip1193Provider
+        await ensureBaseSepolia(provider)
+
+        const ethersProvider = new ethers.BrowserProvider(provider)
         const signer = await ethersProvider.getSigner()
 
         const network = await ethersProvider.getNetwork()
-        if (network.chainId !== BASE_SEPOLIA_CHAIN_ID) {
+        if (Number(network.chainId) !== BASE_SEPOLIA_CHAIN_ID_DEC && network.chainId !== BASE_SEPOLIA_CHAIN_ID) {
           throw new Error("Switch to Base Sepolia")
         }
 
