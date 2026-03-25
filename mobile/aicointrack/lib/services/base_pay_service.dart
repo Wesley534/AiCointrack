@@ -6,7 +6,7 @@ class BasePayService {
   static const String _callbackScheme = 'aicointrackpay';
 
   // Miniapp pay page on the web (hosted miniapp)
-  static const String _payUrlBase = 'https://cointrack-nu.vercel.app/pay';
+  static const String _payUrlBase = 'https://app.aicointrack.xyz/pay';
 
   /// Opens the miniapp pay page in an in-app browser and returns a map
   /// containing { 'status': 'completed'|'cancelled'|'failed', 'id': ..., 'txHash': ... }
