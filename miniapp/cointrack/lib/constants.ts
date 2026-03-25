@@ -1,6 +1,12 @@
-// Base Sepolia testnet
-// Chain ID for Base Sepolia (matches wagmi config in rootProvider/loginProvider)
-export const BASE_CHAIN_ID = 84532
+export const CONFIG = {
+  DOMAIN: "app.aicointrack.xyz",
+  URL: "https://app.aicointrack.xyz",
+  CHAIN_ID: 84532,
+} as const
+
+export const BASE_CHAIN_ID = CONFIG.CHAIN_ID
+export const APP_DOMAIN = CONFIG.DOMAIN
+export const APP_URL = CONFIG.URL
 
 // Base Sepolia USDC (Circle's official test USDC on Base Sepolia)
 // Faucet: https://faucet.circle.com (select Base Sepolia)

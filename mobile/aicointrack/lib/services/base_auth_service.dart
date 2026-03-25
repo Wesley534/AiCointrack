@@ -62,7 +62,9 @@ class BaseAuthService {
       // ── 2. Parse the callback URL ────────────────────────────────────────────
       // Expected: aicointrack://login?address=0x…&message=…&signature=0x…
       final uri = Uri.parse(resultUrl);
-      debugPrint('BaseAuth: callback uri received path=${uri.path} host=${uri.host}');
+      debugPrint(
+        'BaseAuth: callback uri received path=${uri.path} host=${uri.host}',
+      );
 
       // Log lengths only (avoid flooding logs with large SIWE messages).
       debugPrint(
@@ -120,19 +122,25 @@ class BaseAuthService {
           debugPrint('BaseAuth: Firebase custom-token sign-in skipped: $e');
         }
       } else {
-        debugPrint('BaseAuth: no firebase_custom_token returned (JWT-only session)');
+        debugPrint(
+          'BaseAuth: no firebase_custom_token returned (JWT-only session)',
+        );
       }
 
       // ── 6. Force navigation regardless of stream timing ──────────────────────
       final ctx = navigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
-        debugPrint('BaseAuth: forcing navigation to HomePage using navigatorKey');
+        debugPrint(
+          'BaseAuth: forcing navigation to HomePage using navigatorKey',
+        );
         navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       } else {
-        debugPrint('BaseAuth: navigatorKey context unavailable; relying on auth stream/FutureBuilder');
+        debugPrint(
+          'BaseAuth: navigatorKey context unavailable; relying on auth stream/FutureBuilder',
+        );
       }
 
       debugPrint('BaseAuth: loginWithBase success');

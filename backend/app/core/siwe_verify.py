@@ -15,6 +15,8 @@ from siwe import SiweMessage
 logger = logging.getLogger(__name__)
 
 _SCRIPT_PATH = Path(__file__).resolve().parent.parent.parent / "scripts" / "verify_siwe.mjs"
+EXPECTED_CHAIN_ID = 84532
+EXPECTED_DOMAIN = "app.aicointrack.xyz"
 
 
 def _verify_via_node(address: str, message: str, signature: str) -> bool:
@@ -62,6 +64,14 @@ def verify_siwe_signature(address: str, message: str, signature: str) -> bool:
 
     try:
         siwe_msg = SiweMessage.from_message(message=message)
+
+        # Enforce app domain + Base Sepolia before signature verification.
+        if siwe_msg.domain != EXPECTED_DOMAIN:
+            raise ValueError(f"Invalid domain: {siwe_msg.domain}")
+
+        if int(siwe_msg.chain_id) != EXPECTED_CHAIN_ID:
+            raise Exception("Invalid chain")
+
         siwe_msg.verify(sig)
         if siwe_msg.address.lower() != addr.lower():
             raise ValueError(f"Address mismatch: recovered {siwe_msg.address}, claimed {addr}")
