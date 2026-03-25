@@ -11,7 +11,7 @@ import '../pages/home_page.dart';
 /// Handles "Sign in with Base" using the miniapp /login page.
 ///
 /// Flow:
-///   1. Opens https://cointrack-nu.vercel.app/login?redirect=aicointrack
+///   1. Opens https://app.aicointrack.xyz/login?redirect=aicointrack
 ///      in an in-app browser tab (flutter_web_auth_2).
 ///   2. The web page connects the user's Base smart wallet, builds a SIWE
 ///      message, requests a passkey-backed signature, then redirects to
@@ -32,7 +32,7 @@ class BaseAuthService {
 
   /// Full URL of the miniapp login page.
   static const String _loginUrl =
-      'https://cointrack-nu.vercel.app/login?redirect=$_callbackScheme';
+      'https://app.aicointrack.xyz/login?redirect=$_callbackScheme';
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -64,6 +64,11 @@ class BaseAuthService {
       final uri = Uri.parse(resultUrl);
       debugPrint('BaseAuth: callback uri received path=${uri.path} host=${uri.host}');
 
+      // Log lengths only (avoid flooding logs with large SIWE messages).
+      debugPrint(
+        'BaseAuth: callback url len=${resultUrl.length} queryKeys=${uri.queryParameters.keys.toList()}',
+      );
+
       final address = uri.queryParameters['address'];
       // The miniapp URL-encodes the message via URLSearchParams; Uri.parse
       // automatically percent-decodes query values for us.
@@ -74,6 +79,16 @@ class BaseAuthService {
         throw const FormatException(
           'Callback URL is missing required parameters (address / message / signature).',
         );
+      }
+
+      debugPrint(
+        'BaseAuth: parsed address=${address.substring(0, address.length.clamp(0, address.length))} '
+        'messageLen=${message.length} signatureLen=${signature.length}',
+      );
+      if (signature.isNotEmpty) {
+        final head = signature.length > 12 ? signature.substring(0, 12) : signature;
+        final tail = signature.length > 12 ? signature.substring(signature.length - 8) : '';
+        debugPrint('BaseAuth: signature head=$head tail=$tail');
       }
 
       debugPrint('✓ BaseAuth: received callback for $address');
