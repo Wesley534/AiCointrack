@@ -1,5 +1,7 @@
 "use client"
 import { useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
+import { ethers } from "ethers"
 import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
@@ -13,9 +15,17 @@ interface SendSheetProps {
 
 type TransactionMode = "onchain" | "offchain"
 
+const BASE_SEPOLIA_CHAIN_ID = BigInt(84532)
+const USDC_ADDRESS = "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+const USDC_ABI = [
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function decimals() view returns (uint8)",
+]
+
 export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
   const { theme } = useAppStore()
   const colors = theme === "light" ? lightTheme : darkTheme
+  const queryClient = useQueryClient()
 
   const [mode, setMode] = useState<TransactionMode>("onchain")
   const [recipient, setRecipient] = useState("")
@@ -24,6 +34,8 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
   const [offchainSource, setOffchainSource] = useState<"mpesa" | "bank" | "cash">("mpesa")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [successHash, setSuccessHash] = useState("")
+  const [step, setStep] = useState<"idle" | "confirm" | "sending" | "waiting">("idle")
 
   const handleSend = async () => {
     if (!amount) {
@@ -38,21 +50,65 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
 
     setLoading(true)
     setError("")
+    setSuccessHash("")
+    setStep("idle")
 
     try {
       const txAmount = parseFloat(amount)
+      if (Number.isNaN(txAmount) || txAmount <= 0) {
+        throw new Error("Enter a valid amount")
+      }
 
       if (mode === "onchain") {
-        // Send onchain USDC
-        const txHash = "0x" + Math.random().toString(16).substring(2, 18)
+        if (!ethers.isAddress(recipient)) {
+          throw new Error("Enter a valid recipient address")
+        }
+
+        const provider = (window as Window & { ethereum?: unknown }).ethereum
+        if (!provider) {
+          throw new Error("Base Wallet not found")
+        }
+
+        const ethersProvider = new ethers.BrowserProvider(provider as ethers.Eip1193Provider)
+        const signer = await ethersProvider.getSigner()
+
+        const network = await ethersProvider.getNetwork()
+        if (network.chainId !== BASE_SEPOLIA_CHAIN_ID) {
+          throw new Error("Switch to Base Sepolia")
+        }
+
+        const usdc = new ethers.Contract(USDC_ADDRESS, USDC_ABI, signer)
+        const value = ethers.parseUnits(amount, 6)
+
+        setStep("confirm")
+        const tx = await usdc.transfer(recipient, value)
+
+        setStep("sending")
+        setStep("waiting")
+        const receipt = await tx.wait()
+        const txHash = receipt?.hash
+
+        if (!txHash) {
+          throw new Error("Transaction confirmed but hash was unavailable")
+        }
 
         await recordOnchainTx({
           tx_hash: txHash,
           amount_usdc: txAmount,
           recipient,
-          note: description || "Sent via miniapp",
+          currency: "USDC",
+          description: description || "Sent via miniapp",
+          transaction_type: "expense",
           category: "Transfer",
         })
+
+        await queryClient.invalidateQueries({ queryKey: ["wallet-balance"] })
+        await queryClient.invalidateQueries({ queryKey: ["transactions"] })
+
+        setRecipient("")
+        setAmount("")
+        setDescription("")
+        setSuccessHash(txHash)
       } else {
         // Record offchain transaction
         await recordOffchainTx({
@@ -62,17 +118,18 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           category: "Transfer",
           currency: "KES",
         })
-      }
 
-      // Reset and close
-      setRecipient("")
-      setAmount("")
-      setDescription("")
-      onClose()
+        // Reset and close for offchain flow
+        setRecipient("")
+        setAmount("")
+        setDescription("")
+        onClose()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Transaction failed")
     } finally {
       setLoading(false)
+      setStep("idle")
     }
   }
 
@@ -234,6 +291,37 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         {error && (
           <div style={{ color: colors.red, fontSize: 13, textAlign: "center" }}>
             {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ color: colors.muted, fontSize: 12, textAlign: "center" }}>
+            {step === "confirm" && "Confirm in Base Wallet..."}
+            {step === "sending" && "Sending USDC..."}
+            {step === "waiting" && "Waiting for confirmation..."}
+          </div>
+        )}
+
+        {successHash && (
+          <div
+            style={{
+              background: theme === "light" ? colors.accentBg : colors.card,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 10,
+              padding: 12,
+              textAlign: "center",
+              fontSize: 13,
+            }}
+          >
+            <div style={{ marginBottom: 6, color: colors.text }}>USDC sent successfully.</div>
+            <a
+              href={`https://sepolia.basescan.org/tx/${successHash}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: colors.accent, fontWeight: 700, textDecoration: "underline" }}
+            >
+              View on BaseScan
+            </a>
           </div>
         )}
 
