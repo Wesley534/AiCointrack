@@ -6,7 +6,17 @@ import { useAppStore } from "@/store"
 import { lightTheme, darkTheme } from "@/lib/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
-import { recordOnchainTx, recordOffchainTx } from "@/lib/api"
+import { recordOnchainTx, recordOffchainTx, updateTransactionFingerprint } from "@/lib/api"
+import { sendUsdc, storeHashOnChain } from "@/lib/wagmi"
+import { payWithBase, getBasePaymentStatus, BasePaymentStatus, BasePaymentResult } from "@/lib/basePay"
+
+// Helper: wrap a promise with a timeout (rejects after `ms`)
+function withTimeout<T>(p: Promise<T>, ms: number) {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Operation timed out")), ms)),
+  ])
+}
 
 interface SendSheetProps {
   isOpen: boolean
@@ -42,7 +52,6 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
       setError("Please enter an amount")
       return
     }
-
     if (mode === "onchain" && !recipient) {
       setError("Please enter a recipient address")
       return
@@ -92,14 +101,46 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           throw new Error("Transaction confirmed but hash was unavailable")
         }
 
-        await recordOnchainTx({
+          // Poll for completion (short timeout) so we can record onchain tx details
+          const timeoutMs = 120_000
+          const start = Date.now()
+          let status: BasePaymentStatus | null = null
+          if (paymentId) {
+            while (Date.now() - start < timeoutMs) {
+              status = await getBasePaymentStatus(paymentId, true)
+              if (status?.status === "completed") break
+              await new Promise(r => setTimeout(r, 2000))
+            }
+          }
+
+          // Prefer the on-chain transaction hash if available, otherwise fall back to payment id
+          broadcastedHash = (status && status.transactionHash) ? String(status.transactionHash) : paymentId
+        } else {
+          const txHash = await sendUsdc(config, recipient, usdcAmount)
+          broadcastedHash = txHash
+        }
+
+        // Step 2: Canonical data for fingerprint
+        const canonicalData = {
+          amount: usdcAmount,
+          currency: "USDC",
+          description: description || `Sent to ${recipient.slice(0, 8)}...`,
+          recipient: recipient.toLowerCase(),
+          transaction_type: "expense",
+          timestamp: new Date().toISOString().slice(0, 19) + "Z",
+        }
+
+        // Step 3: Record in backend DB to get tx id
+        const txHash = broadcastedHash ?? ""
+        const { data: savedTx } = await recordOnchainTx({
           tx_hash: txHash,
-          amount_usdc: txAmount,
+          amount_usdc: usdcAmount,
           recipient,
           currency: "USDC",
           description: description || "Sent via miniapp",
           transaction_type: "expense",
           category: "Transfer",
+          transaction_type: "expense",
         })
 
         await queryClient.invalidateQueries({ queryKey: ["wallet-balance"] })
@@ -110,13 +151,14 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         setDescription("")
         setSuccessHash(txHash)
       } else {
-        // Record offchain transaction
+        const txAmount = parseFloat(amount)
         await recordOffchainTx({
           amount: txAmount,
           description: description || `Sent via ${offchainSource}`,
           source: offchainSource,
           category: "Transfer",
           currency: "KES",
+          transaction_type: "expense",
         })
 
         // Reset and close for offchain flow
@@ -126,7 +168,22 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         onClose()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transaction failed")
+      const msg = err instanceof Error ? err.message : String(err)
+      // Treat timeouts as latency rather than hard failures when tx was broadcast
+      if (msg.toLowerCase().includes("timed out") || msg.toLowerCase().includes("timeout")) {
+        if (broadcastedHash) {
+          setError("Transaction is taking longer than expected. It was broadcast; check explorer for status.")
+          setLoading(false)
+          setStep("idle")
+          onClose()
+        } else {
+          setError("Transaction timed out before broadcasting. Tap Send to try again.")
+        }
+      } else if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
+        setError("Transaction cancelled. Tap Send to try again.")
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
       setStep("idle")

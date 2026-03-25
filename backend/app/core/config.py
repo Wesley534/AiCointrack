@@ -40,9 +40,12 @@ class Settings(BaseSettings):
             f"@{self.MYSQL_SERVER}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
         )
 
-    class Config:
-        case_sensitive = True
-        env_file = ".env"
+    # Pydantic v2 config
+    model_config = {
+        "case_sensitive": True,
+        "env_file": ".env",
+        "extra": "ignore",
+    }
 
 
 settings = Settings()
