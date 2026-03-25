@@ -81,6 +81,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>aicointrack</string>
+				<string>aicointrackpay</string>
 			</array>
 		</dict>
 	</array>

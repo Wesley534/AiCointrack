@@ -39,16 +39,36 @@ export async function sendUsdc(
   const amountWei = parseUsdc(amount)
   if (amountWei === BigInt(0)) throw new Error("Amount must be greater than 0")
 
-  const hash = await writeContract(config, {
-    address: USDC_ADDRESS,
-    abi: ERC20_ABI,
-    functionName: "transfer",
-    args: [to as `0x${string}`, amountWei],
-  })
+  let hash: `0x${string}`
+  try {
+    hash = await writeContract(config, {
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: "transfer",
+      args: [to as `0x${string}`, amountWei],
+    })
+  } catch (err: unknown) {
+    // Surface a helpful error message for common wallet/chain issues
+    const hint = `writeContract failed — check wallet network (should be Base Sepolia), ensure your wallet is unlocked, has gas, and that USDC (${USDC_ADDRESS}) exists on that network.`
+    let errMessage = ""
+    if (err instanceof Error) errMessage = err.message
+    else {
+      try {
+        errMessage = String(err ?? "")
+      } catch {
+        errMessage = "Unknown error"
+      }
+    }
+    console.error("sendUsdc writeContract error:", err)
+    throw new Error(errMessage ? `${errMessage} — ${hint}` : `sendUsdc failed — ${hint}`)
+  }
 
   await waitForTransactionReceipt(config, {
     hash,
     confirmations: 1,
+    timeout: 120_000,
+    pollingInterval: 10_000,
+    retryCount: 10,
   })
 
   return hash
@@ -83,6 +103,9 @@ export async function storeHashOnChain(
   await waitForTransactionReceipt(config, {
     hash,
     confirmations: 1,
+    timeout: 120_000,
+    pollingInterval: 10_000,
+    retryCount: 10,
   })
 
   return fingerprint

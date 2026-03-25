@@ -7,7 +7,7 @@ import { usdcToKes } from "@/lib/format"
 export function useWalletBalance() {
   const { address } = useAccount()
   const config = useConfig()
-  const { usdKesRate, setWalletBalance, jwt } = useAppStore()
+  const { usdKesRate, setWalletBalance } = useAppStore()
 
   return useQuery({
     queryKey: ["wallet-balance", address],
@@ -22,7 +22,8 @@ export function useWalletBalance() {
 
       return { usdc, kes }
     },
-    enabled: !!address && !!jwt,
+    // JWT not required for on-chain balance reads — enable when address is present
+    enabled: !!address,
     staleTime: 60000,
     gcTime: 5 * 60000,
     refetchOnMount: true,

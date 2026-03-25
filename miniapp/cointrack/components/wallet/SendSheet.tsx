@@ -7,6 +7,15 @@ import BottomSheet from "@/components/ui/BottomSheet"
 import AmountInput from "@/components/ui/AmountInput"
 import { recordOnchainTx, recordOffchainTx, updateTransactionFingerprint } from "@/lib/api"
 import { sendUsdc, storeHashOnChain } from "@/lib/wagmi"
+import { payWithBase, getBasePaymentStatus, BasePaymentStatus, BasePaymentResult } from "@/lib/basePay"
+
+// Helper: wrap a promise with a timeout (rejects after `ms`)
+function withTimeout<T>(p: Promise<T>, ms: number) {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("Operation timed out")), ms)),
+  ])
+}
 
 interface SendSheetProps {
   isOpen: boolean
@@ -43,14 +52,39 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
     setLoading(true)
     setError("")
     setStep("idle")
+    let broadcastedHash: string | undefined
 
     try {
       if (mode === "onchain") {
         const usdcAmount = parseFloat(amount)
 
-        // Step 1: Send real USDC on Base Sepolia
+        // Step 1: Send real USDC on Base Sepolia (prefer Base Pay SDK)
         setStep("sending")
-        const txHash = await sendUsdc(config, recipient, usdcAmount)
+        const baseSdkAvailable = typeof window !== "undefined" && ((window as unknown as Window & { base?: unknown }).base !== undefined)
+        if (baseSdkAvailable) {
+          // Use Base Pay SDK which accepts USD strings (quotes USDC) and handles wallet UX
+          const amountStr = Number(usdcAmount).toFixed(2)
+          const payment = await payWithBase(amountStr, recipient, true) as BasePaymentResult
+          const paymentId = payment?.id
+
+          // Poll for completion (short timeout) so we can record onchain tx details
+          const timeoutMs = 120_000
+          const start = Date.now()
+          let status: BasePaymentStatus | null = null
+          if (paymentId) {
+            while (Date.now() - start < timeoutMs) {
+              status = await getBasePaymentStatus(paymentId, true)
+              if (status?.status === "completed") break
+              await new Promise(r => setTimeout(r, 2000))
+            }
+          }
+
+          // Prefer the on-chain transaction hash if available, otherwise fall back to payment id
+          broadcastedHash = (status && status.transactionHash) ? String(status.transactionHash) : paymentId
+        } else {
+          const txHash = await sendUsdc(config, recipient, usdcAmount)
+          broadcastedHash = txHash
+        }
 
         // Step 2: Canonical data for fingerprint
         const canonicalData = {
@@ -63,6 +97,7 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
         }
 
         // Step 3: Record in backend DB to get tx id
+        const txHash = broadcastedHash ?? ""
         const { data: savedTx } = await recordOnchainTx({
           tx_hash: txHash,
           amount_usdc: usdcAmount,
@@ -72,25 +107,34 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           transaction_type: "expense",
         })
 
-        // Step 4: Store fingerprint on HashStore contract (non-fatal)
+        // Schedule fingerprinting in the background (non-blocking).
+        // Use a timeout so the UI can't hang indefinitely if RPC/backend stalls.
         if (user?.id && savedTx?.id) {
-          try {
-            setStep("storing")
-            const fingerprint = await storeHashOnChain(
-              config,
-              user.id,
-              savedTx.id,
-              canonicalData
-            )
-            console.log("On-chain fingerprint stored:", fingerprint)
-            console.log("View on explorer: https://sepolia.basescan.org/tx/" + txHash)
+          ;(async () => {
+            try {
+              setStep("storing")
+              const fingerprint = await withTimeout(
+                storeHashOnChain(config, user.id, savedTx.id, canonicalData),
+                120_000
+              )
+              console.log("On-chain fingerprint stored:", fingerprint)
+              console.log("View on explorer: https://sepolia.basescan.org/tx/" + txHash)
 
-            // Step 5: Update backend with the fingerprint
-            await updateTransactionFingerprint(savedTx.id, fingerprint, txHash)
-          } catch (hashErr) {
-            console.warn("Hash storage failed (non-fatal):", hashErr)
-          }
+              // Update backend with the fingerprint (best-effort)
+              await updateTransactionFingerprint(savedTx.id, fingerprint, txHash)
+            } catch (hashErr) {
+              console.warn("Hash storage failed (non-fatal):", hashErr)
+            } finally {
+              setStep("idle")
+            }
+          })()
         }
+
+        // Close the sheet and clear inputs immediately after the critical onchain steps
+        setRecipient("")
+        setAmount("")
+        setDescription("")
+        onClose()
       } else {
         const txAmount = parseFloat(amount)
         await recordOffchainTx({
@@ -101,22 +145,33 @@ export default function SendSheet({ isOpen, onClose }: SendSheetProps) {
           currency: "KES",
           transaction_type: "expense",
         })
-      }
 
-      setRecipient("")
-      setAmount("")
-      setDescription("")
-      onClose()
+        // Close sheet immediately after offchain record succeeds
+        setRecipient("")
+        setAmount("")
+        setDescription("")
+        onClose()
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Transaction failed"
-      if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
+      const msg = err instanceof Error ? err.message : String(err)
+      // Treat timeouts as latency rather than hard failures when tx was broadcast
+      if (msg.toLowerCase().includes("timed out") || msg.toLowerCase().includes("timeout")) {
+        if (broadcastedHash) {
+          setError("Transaction is taking longer than expected. It was broadcast; check explorer for status.")
+          setLoading(false)
+          setStep("idle")
+          onClose()
+        } else {
+          setError("Transaction timed out before broadcasting. Tap Send to try again.")
+        }
+      } else if (msg.toLowerCase().includes("rejected") || msg.toLowerCase().includes("denied")) {
         setError("Transaction cancelled. Tap Send to try again.")
       } else {
         setError(msg)
       }
     } finally {
       setLoading(false)
-      setStep("done")
+      setStep("idle")
     }
   }
 
