@@ -45,6 +45,9 @@ class TransactionResponse(TransactionBase):
     recipient: Optional[str] = None
     reference_number: Optional[str] = None
     is_verified: bool = False
+    onchain_hash: Optional[str] = None
+    hash_store_tx: Optional[str] = None
+    fingerprint_stored_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

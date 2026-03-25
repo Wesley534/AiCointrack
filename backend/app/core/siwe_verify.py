@@ -31,9 +31,24 @@ def _verify_via_node(address: str, message: str, signature: str) -> bool:
             timeout=10,
             cwd=Path(script).parent,
         )
-        return result.returncode == 0
+        if result.returncode == 0:
+            return True
+        # Log stdout/stderr for debugging when Node verification fails
+        try:
+            stdout = result.stdout.decode('utf-8', errors='replace')
+            stderr = result.stderr.decode('utf-8', errors='replace')
+        except Exception:
+            stdout = str(result.stdout)
+            stderr = str(result.stderr)
+        logger.warning(
+            "Node SIWE verification returned non-zero exit. rc=%s stdout=%s stderr=%s",
+            result.returncode,
+            stdout,
+            stderr,
+        )
+        return False
     except Exception as e:
-        logger.warning(f"Node SIWE verification failed: {e}")
+        logger.warning("Node SIWE verification failed", exc_info=True)
         return False
 
 
@@ -62,8 +77,8 @@ def verify_siwe_signature(address: str, message: str, signature: str) -> bool:
             raise ValueError(f"Address mismatch: recovered {siwe_msg.address}, claimed {addr}")
         return True
     except Exception as e:
-        logger.info(f"Python SIWE verify failed ({e}), trying Node/viem fallback for ERC-6492")
+        logger.info("Python SIWE verify failed (%s), trying Node/viem fallback for ERC-6492", repr(e))
         if _verify_via_node(addr, message, sig):
             return True
-        logger.warning(f"SIWE verification failed: {e}")
+        logger.warning("SIWE verification failed", exc_info=True)
         raise ValueError(f"Invalid signature: {e}")

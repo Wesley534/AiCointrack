@@ -155,7 +155,11 @@ export default function LoginPage() {
                     <button
                         id="base-connect-button"
                         style={styles.connectBtn}
-                        onClick={() => connect({ connector: coinbaseWallet() })}
+                        // Ensure we don't default to Base smart-wallet (ERC-6492) signatures
+                        // until backend verification supports them reliably.
+                        onClick={() =>
+                            connect({ connector: coinbaseWallet({ preference: "all" }) })
+                        }
                     >
                         <span style={styles.connectIcon}>🔑</span>
                         <div>

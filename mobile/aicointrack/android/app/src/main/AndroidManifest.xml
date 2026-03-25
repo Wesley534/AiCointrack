@@ -31,9 +31,11 @@
         <activity android:name="com.linusu.flutter_web_auth_2.CallbackActivity" android:exported="true">
             <intent-filter android:label="flutter_web_auth_2">
                 <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
+                <!-- Needed so redirects coming from an in-app browser (custom tabs/webview) resolve properly. -->
                 <category android:name="android.intent.category.BROWSABLE" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="aicointrack" />
+                <data android:scheme="aicointrackpay" />
             </intent-filter>
         </activity>
 

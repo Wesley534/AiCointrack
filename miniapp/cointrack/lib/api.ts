@@ -1,7 +1,8 @@
 import axios from "axios"
-import { API_BASE_URL } from "./constants"
 
-const api = axios.create({ baseURL: API_BASE_URL })
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ""
+
+const api = axios.create({ baseURL: API_BASE_URL, timeout: 15_000 })
 
 // Attach JWT to every request
 api.interceptors.request.use(config => {
@@ -138,6 +139,16 @@ export const createTransaction = (data: {
 
 export const categorizeWithAI = (description: string, amount: number) =>
   api.post("/api/v1/transactions/ai-categorize", { description, amount })
+
+export const updateTransactionFingerprint = (
+  txId: number,
+  onchain_hash: string,
+  hash_store_tx: string
+) =>
+  api.patch(`/api/v1/transactions/${txId}/fingerprint`, {
+    onchain_hash,
+    hash_store_tx,
+  })
 
 // ── SHOPPING ──────────────────────────────────────────
 export const getShoppingLists = () =>
