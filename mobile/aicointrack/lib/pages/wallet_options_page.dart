@@ -116,7 +116,7 @@ class _WalletOptionsPageState extends State<WalletOptionsPage> {
                       title: const Text('Connect wallet'),
                       content: const Text(
                         'WalletConnect integration coming soon. '
-                        'For now, open CoinTrack in the Base app to use your wallet.',
+                        'For now, open CoinTrack via the Base/Coinbase Wallet browser to ensure the window.base provider is injected.',
                       ),
                       actions: [
                         TextButton(
