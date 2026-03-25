@@ -10,6 +10,7 @@ import 'transactions_page.dart';
 import 'shopping_pages.dart';
 import 'savings_closeout_pages.dart';
 import '../services/auth_service.dart';
+import '../services/base_pay_service.dart';
 import 'login_page.dart';
 import 'settings_page.dart';
 import '../utils/formatters.dart';
@@ -96,6 +97,28 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     }
+  }
+
+  Future<Map<String, String>?> _startBasePay(String amount, String to) async {
+    final result = await BasePayService.startPay(amount: amount, to: to);
+    if (result != null) {
+      // Best-effort: record the onchain transfer with backend as an "onchain" transaction.
+      final txHash = result['txHash'] ?? result['transactionHash'] ?? result['tx_hash'];
+      try {
+        await ApiService.recordOffchainTransaction(
+          description: 'Base Pay transfer',
+          amount: double.tryParse(amount) ?? 0.0,
+          source: 'onchain',
+          transactionType: 'expense',
+          category: 'Transfer',
+          currency: 'USDC',
+          referenceNumber: txHash,
+        );
+      } catch (_) {
+        // ignore; backend recording is best-effort here
+      }
+    }
+    return result;
   }
 
   Future<void> _handleLogout() async {
@@ -830,80 +853,164 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
               const SizedBox(height: 20),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [
-                            AppColors.accent.withOpacity(0.15),
-                            AppColors.purple.withOpacity(0.08),
-                          ]
-                        : [AppColors.accent, AppColors.accentDim],
-                  ),
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.purple.withOpacity(0.27)
-                        : Colors.transparent,
-                  ),
-                ),
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              SizedBox(
+                height: 180,
+                child: PageView(
+                  controller: PageController(viewportFraction: 0.92),
                   children: [
-                    Text(
-                      'FREE TO SPEND',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark
-                            ? heroTextColor.withOpacity(0.85)
-                            : heroTextColor.withOpacity(0.85),
+                    // Existing hero card (wrapped)
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isDark
+                              ? [
+                                  AppColors.accent.withOpacity(0.15),
+                                  AppColors.purple.withOpacity(0.08),
+                                ]
+                              : [AppColors.accent, AppColors.accentDim],
+                        ),
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.purple.withOpacity(0.27)
+                              : Colors.transparent,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    _summaryLoading
-                        ? _buildSkeletonBox(height: 36, width: 180, radius: 12)
-                        : Text(
-                            Formatters.formatKes(freeToSpend),
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'FREE TO SPEND',
                             style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w800,
-                              color: heroTextColor,
+                              fontSize: 12,
+                              color: isDark
+                                  ? heroTextColor.withOpacity(0.85)
+                                  : heroTextColor.withOpacity(0.85),
                             ),
                           ),
-                    const SizedBox(height: 8),
-                    _summaryLoading
-                        ? _buildSkeletonBox(height: 28, width: 180, radius: 999)
-                        : _buildPill(
-                            '✓ ${variance >= 0 ? '+' : '-'}${Formatters.formatKes(variance.abs())} vs last month',
-                            AppColors.lightCardWhite,
+                          const SizedBox(height: 4),
+                          _summaryLoading
+                              ? _buildSkeletonBox(height: 36, width: 180, radius: 12)
+                              : Text(
+                                  Formatters.formatKes(freeToSpend),
+                                  style: TextStyle(
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.w800,
+                                    color: heroTextColor,
+                                  ),
+                                ),
+                          const SizedBox(height: 8),
+                          _summaryLoading
+                              ? _buildSkeletonBox(height: 28, width: 180, radius: 999)
+                              : _buildPill(
+                                  '✓ ${variance >= 0 ? '+' : '-'}${Formatters.formatKes(variance.abs())} vs last month',
+                                  AppColors.lightCardWhite,
+                                ),
+                          const SizedBox(height: 14),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Month progress',
+                                style: TextStyle(fontSize: 12, color: heroTextColor),
+                              ),
+                              Text(
+                                'March 8 / 31',
+                                style: TextStyle(fontSize: 12, color: heroTextColor),
+                              ),
+                            ],
                           ),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Month progress',
-                          style: TextStyle(fontSize: 12, color: heroTextColor),
-                        ),
-                        Text(
-                          'March 8 / 31',
-                          style: TextStyle(fontSize: 12, color: heroTextColor),
-                        ),
-                      ],
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: _summaryLoading ? 0.0 : monthProgress,
+                              minHeight: 4,
+                              backgroundColor: borderColor,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                AppColors.accent,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(99),
-                      child: LinearProgressIndicator(
-                        value: _summaryLoading ? 0.0 : monthProgress,
-                        minHeight: 4,
-                        backgroundColor: borderColor,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          AppColors.accent,
-                        ),
+
+                    // New Base Pay card
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: isDark ? AppColors.darkCard : AppColors.lightCardWhite,
+                        border: Border.all(color: borderColor),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'BASE PAY (USDC)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _summaryLoading
+                              ? _buildSkeletonBox(height: 28, width: 140)
+                              : Text(
+                                  // Prefer known keys from wallet balance endpoint
+                                  (_summary['usdc_balance']?.toString() ?? _summary['wallet_balance']?.toString() ?? _summary['balance']?.toString() ?? '0'),
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    color: textColor,
+                                  ),
+                                ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Show wallet balance and send USDC on Base Sepolia',
+                            style: TextStyle(fontSize: 12, color: mutedColor),
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _summaryLoading ? null : () async {
+                                    // Open miniapp pay page via BasePayService
+                                    try {
+                                      final amount = '1.00';
+                                      final to = _summary['default_receive_address'] ?? '';
+                                      // Defer importing to avoid cycles
+                                      final service = await _startBasePay(amount, to ?? '');
+                                      if (service == null) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Payment cancelled or failed')),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text('Payment status: ${service['status']}')),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Payment error: $e')),
+                                      );
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.accent,
+                                  ),
+                                  child: const Text('Send USDC'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
