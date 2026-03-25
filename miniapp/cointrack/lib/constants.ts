@@ -1,4 +1,12 @@
-export const BASE_CHAIN_ID = 8453
+export const CONFIG = {
+  DOMAIN: "app.aicointrack.xyz",
+  URL: "https://app.aicointrack.xyz",
+  CHAIN_ID: 84532,
+} as const
+
+export const BASE_CHAIN_ID = CONFIG.CHAIN_ID
+export const APP_DOMAIN = CONFIG.DOMAIN
+export const APP_URL = CONFIG.URL
 
 // USDC on Base mainnet
 export const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"

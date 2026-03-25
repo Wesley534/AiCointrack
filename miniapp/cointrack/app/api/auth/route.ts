@@ -68,7 +68,7 @@ function getUrlHost(request: NextRequest) {
   } else if (process.env.VERCEL_URL) {
     urlValue = `https://${process.env.VERCEL_URL}`;
   } else {
-    urlValue = "http://localhost:3000";
+    urlValue = "https://app.aicointrack.xyz";
   }
 
   const url = new URL(urlValue);

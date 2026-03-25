@@ -1,7 +1,4 @@
-const ROOT_URL =
-  process.env.NEXT_PUBLIC_URL ||
-  (process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`) ||
-  "http://localhost:3000";
+const ROOT_URL = "https://app.aicointrack.xyz";
 
 /**
  * MiniApp configuration object. Must follow the mini app manifest specification.
