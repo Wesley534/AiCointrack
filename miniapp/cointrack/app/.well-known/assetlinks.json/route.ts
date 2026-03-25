@@ -4,10 +4,10 @@
 // App Links for the CoinTrack Flutter app.
 //
 // Once deployed, this will be accessible at:
-//   https://cointrack-nu.vercel.app/.well-known/assetlinks.json
+//   https://app.aicointrack.xyz/.well-known/assetlinks.json
 //
 // Android verifies this file at install time to confirm that
-// https://cointrack-nu.vercel.app app links should open in
+// https://app.aicointrack.xyz app links should open in
 // com.example.aicointrack instead of a browser.
 //
 // ────────────────────────────────────────────────────────────────────────────
