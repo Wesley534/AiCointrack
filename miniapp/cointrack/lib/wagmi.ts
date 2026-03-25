@@ -26,8 +26,10 @@ export async function getUsdcBalance(config: Config, address: string): Promise<b
     address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
-    args: [walletAddress]
+    args: [walletAddress],
   })
+
+  return balance as bigint
 }
 
 // ── Send USDC ──────────────────────────────────────────────
