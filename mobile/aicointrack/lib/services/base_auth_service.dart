@@ -11,7 +11,7 @@ import '../pages/home_page.dart';
 /// Handles "Sign in with Base" using the miniapp /login page.
 ///
 /// Flow:
-///   1. Opens https://cointrack-nu.vercel.app/login?redirect=aicointrack
+///   1. Opens https://app.aicointrack.xyz/login?redirect=aicointrack
 ///      in an in-app browser tab (flutter_web_auth_2).
 ///   2. The web page connects the user's Base smart wallet, builds a SIWE
 ///      message, requests a passkey-backed signature, then redirects to
@@ -32,7 +32,7 @@ class BaseAuthService {
 
   /// Full URL of the miniapp login page.
   static const String _loginUrl =
-      'https://cointrack-nu.vercel.app/login?redirect=$_callbackScheme';
+      'https://app.aicointrack.xyz/login?redirect=$_callbackScheme';
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
@@ -62,7 +62,9 @@ class BaseAuthService {
       // ── 2. Parse the callback URL ────────────────────────────────────────────
       // Expected: aicointrack://login?address=0x…&message=…&signature=0x…
       final uri = Uri.parse(resultUrl);
-      debugPrint('BaseAuth: callback uri received path=${uri.path} host=${uri.host}');
+      debugPrint(
+        'BaseAuth: callback uri received path=${uri.path} host=${uri.host}',
+      );
 
       final address = uri.queryParameters['address'];
       // The miniapp URL-encodes the message via URLSearchParams; Uri.parse
@@ -105,19 +107,25 @@ class BaseAuthService {
           debugPrint('BaseAuth: Firebase custom-token sign-in skipped: $e');
         }
       } else {
-        debugPrint('BaseAuth: no firebase_custom_token returned (JWT-only session)');
+        debugPrint(
+          'BaseAuth: no firebase_custom_token returned (JWT-only session)',
+        );
       }
 
       // ── 6. Force navigation regardless of stream timing ──────────────────────
       final ctx = navigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
-        debugPrint('BaseAuth: forcing navigation to HomePage using navigatorKey');
+        debugPrint(
+          'BaseAuth: forcing navigation to HomePage using navigatorKey',
+        );
         navigatorKey.currentState?.pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const HomePage()),
           (route) => false,
         );
       } else {
-        debugPrint('BaseAuth: navigatorKey context unavailable; relying on auth stream/FutureBuilder');
+        debugPrint(
+          'BaseAuth: navigatorKey context unavailable; relying on auth stream/FutureBuilder',
+        );
       }
 
       debugPrint('BaseAuth: loginWithBase success');

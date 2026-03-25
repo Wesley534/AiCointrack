@@ -67,10 +67,7 @@ class ReownAuthService {
 
             final cacaoSignature = args.cacao != null
                 ? args.cacao!.s
-                : CacaoSignature(
-                    t: CacaoSignature.EIP191,
-                    s: args.signature,
-                  );
+                : CacaoSignature(t: CacaoSignature.EIP191, s: args.signature);
 
             // Verify the signature cryptographically.
             final valid = await SIWEUtils.verifySignature(
@@ -119,9 +116,11 @@ class ReownAuthService {
               return null;
             }
             final chainId =
-                _appKitModal!.selectedChain?.chainId ?? '8453'; // Base
-            final namespace =
-                ReownAppKitModalNetworks.getNamespaceForChainId(chainId);
+                _appKitModal!.selectedChain?.chainId ??
+                AppConstants.BASE_CHAIN_ID.toString();
+            final namespace = ReownAppKitModalNetworks.getNamespaceForChainId(
+              chainId,
+            );
             final address = _appKitModal!.session!.getAddress(namespace);
             if (address == null) return null;
             return SIWESession(address: address, chains: [chainId]);
@@ -161,7 +160,8 @@ class ReownAuthService {
   static Future<bool> loginWithWallet(BuildContext context) async {
     if (_appKitModal == null) {
       throw StateError(
-          'ReownAuthService.init() must be called before loginWithWallet()');
+        'ReownAuthService.init() must be called before loginWithWallet()',
+      );
     }
     try {
       await _appKitModal!.openModalView();
