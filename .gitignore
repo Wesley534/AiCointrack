@@ -56,3 +56,6 @@ logs/
 .coverage
 .pytest_cache/
 coverage/
+
+docs/
+AUTH_ARCHITECTURE.md
