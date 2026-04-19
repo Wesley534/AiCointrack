@@ -9,7 +9,8 @@ class AppConstants {
   // - Remote dev: https://your-devtunnel-url.uks1.devtunnels.ms
   // - Production: https://your-production-api.com
   static const String BACKEND_URL =
-      'https://casual-traveller-talented-engaged.trycloudflare.com';
+      'https://zvhdw4k2-8000.uks1.devtunnels.ms';
+      // 'https://casual-traveller-talented-engaged.trycloudflare.com';
 
   // Firebase Configuration
   // These are configured in firebase_options.dart

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'pages/notification_permission_screen.dart';
@@ -17,6 +18,14 @@ import 'providers/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Environment Configuration ────────────────────────────────────────────────
+  try {
+    await dotenv.load(fileName: '.env');
+    debugPrint('✓ Environment variables loaded from .env');
+  } catch (e) {
+    debugPrint('✗ Environment loading failed (non-fatal): $e');
+  }
 
   // ── Firebase ─────────────────────────────────────────────────────────────────
   try {

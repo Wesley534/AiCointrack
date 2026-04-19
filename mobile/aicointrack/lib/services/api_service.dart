@@ -10,6 +10,8 @@ import '../config/theme.dart';
 class ApiService {
   // Backend URL is configured in lib/config/constants.dart
   static const String baseUrl = AppConstants.BACKEND_URL;
+  // Dev tunnel can introduce significant latency; keep API timeout generous.
+  static const Duration _requestTimeout = Duration(seconds: 60);
 
   /// Register or authenticate user on the backend using Firebase ID token.
   /// Stores the returned JWT for subsequent API calls.
@@ -28,7 +30,7 @@ class ApiService {
             body: jsonEncode({'idToken': idToken}),
           )
           .timeout(
-            const Duration(seconds: 10),
+            _requestTimeout,
             onTimeout: () => throw Exception('Request timeout'),
           );
 
@@ -66,7 +68,7 @@ class ApiService {
           }),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -98,7 +100,7 @@ class ApiService {
           },
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -132,7 +134,7 @@ class ApiService {
           }),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -188,7 +190,7 @@ class ApiService {
             headers: {'Authorization': 'Bearer $token'},
           )
           .timeout(
-            const Duration(seconds: 10),
+            _requestTimeout,
             onTimeout: () => throw Exception('Request timeout'),
           );
 
@@ -257,7 +259,7 @@ class ApiService {
     final response = await http
         .get(uri, headers: headers)
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -301,7 +303,7 @@ class ApiService {
           }),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -316,7 +318,7 @@ class ApiService {
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/budgets/current'), headers: headers)
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -354,7 +356,7 @@ class ApiService {
           }),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -388,7 +390,7 @@ class ApiService {
           }),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -403,7 +405,7 @@ class ApiService {
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/shopping-lists'), headers: headers)
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -430,7 +432,7 @@ class ApiService {
           body: jsonEncode({'name': name, 'budget': budget, 'status': 'green'}),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -450,7 +452,7 @@ class ApiService {
           headers: headers,
         )
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -474,7 +476,7 @@ class ApiService {
           body: jsonEncode({'name': name, 'qty': qty, 'price': price}),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -489,7 +491,7 @@ class ApiService {
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/savings-goals'), headers: headers)
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -522,7 +524,7 @@ class ApiService {
           }),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -545,7 +547,7 @@ class ApiService {
           body: jsonEncode({'amount_usdc': amountUsdc, 'tx_hash': txHash}),
         )
         .timeout(
-          const Duration(seconds: 15),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -560,7 +562,7 @@ class ApiService {
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/dashboard/summary'), headers: headers)
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
@@ -575,7 +577,7 @@ class ApiService {
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/wallet/balance'), headers: headers)
         .timeout(
-          const Duration(seconds: 10),
+          _requestTimeout,
           onTimeout: () => throw Exception('Request timeout'),
         );
 
