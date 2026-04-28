@@ -38,7 +38,9 @@ class _NotificationPermissionScreenState
         // Test the service connection
         try {
           final testResult = await NotificationTransactionService.testService();
-          debugPrint('[NotificationPermission] Service test result: $testResult');
+          debugPrint(
+            '[NotificationPermission] Service test result: $testResult',
+          );
         } catch (e) {
           debugPrint('[NotificationPermission] Service test failed: $e');
         }
@@ -131,6 +133,34 @@ class _NotificationPermissionScreenState
                 borderColor: borderColor,
                 textColor: textColor,
               ),
+              const SizedBox(height: 12),
+              _FeatureBullet(
+                icon: Icons.battery_charging_full_outlined,
+                label: 'Set Battery to Unrestricted on Android',
+                cardColor: cardColor,
+                borderColor: borderColor,
+                textColor: textColor,
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Text(
+                  'Recommended Android setup:\n'
+                  '1. Settings -> Notification Access -> AiCoinTrack -> Allowed\n'
+                  '2. Settings -> Apps -> AiCoinTrack -> Battery -> Unrestricted',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: mutedColor,
+                    height: 1.5,
+                  ),
+                ),
+              ),
               const Spacer(),
               if (_checking) ...[
                 Container(
@@ -150,9 +180,7 @@ class _NotificationPermissionScreenState
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation(
-                            AppColors.accent,
-                          ),
+                          valueColor: AlwaysStoppedAnimation(AppColors.accent),
                         ),
                       ),
                       const SizedBox(width: 10),

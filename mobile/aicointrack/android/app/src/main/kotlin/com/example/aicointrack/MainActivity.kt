@@ -55,6 +55,39 @@ class MainActivity : FlutterActivity() {
                     android.util.Log.d("MainActivity", "Testing notification service")
                     result.success("Notification service test completed")
                 }
+                "getPendingTransactions" -> {
+                    try {
+                        val prefs = getSharedPreferences(NotificationService.PREFS_NAME, MODE_PRIVATE)
+                        val raw = prefs.getString(NotificationService.PREFS_KEY, null)
+                        Log.d("MainActivity", "getPendingTransactions rawPresent=${raw != null} rawLength=${raw?.length ?: 0}")
+                        if (raw == null) {
+                            result.success(emptyList<String>())
+                        } else {
+                            val trimmed = raw.trim()
+                            if (!trimmed.startsWith("[")) {
+                                // Corrupt native pending payload; clear and continue.
+                                Log.w("MainActivity", "getPendingTransactions found non-JSON payload for ${NotificationService.PREFS_KEY}; clearing value")
+                                prefs.edit().remove(NotificationService.PREFS_KEY).apply()
+                                result.success(emptyList<String>())
+                                return@setMethodCallHandler
+                            }
+
+                            // Parse JSONArray to List<String>
+                            val arr = org.json.JSONArray(trimmed)
+                            val out = ArrayList<String>()
+                            for (i in 0 until arr.length()) {
+                                out.add(arr.getString(i))
+                            }
+                            Log.d("MainActivity", "getPendingTransactions parsed count=${out.size}")
+                            // Clear after reading so Flutter becomes authoritative
+                            prefs.edit().remove(NotificationService.PREFS_KEY).apply()
+                            result.success(out)
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "getPendingTransactions failed", e)
+                        result.error("error", "Failed to read pending transactions", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -82,5 +115,12 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             Log.w("MainActivity", "onNewIntent: failed to log new intent: $e")
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Prevent NotificationService from attempting to use a stale channel when Flutter is detached.
+        notifChannel = null
+        Log.d("MainActivity", "onDestroy cleared notifChannel")
     }
 }
