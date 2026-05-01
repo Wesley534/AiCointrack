@@ -11,8 +11,8 @@ class NotificationService : NotificationListenerService() {
 
     companion object {
         const val CHANNEL = "com.cointrack/notifications"
-        private const val PREFS_NAME = "FlutterSharedPreferences"
-        private const val PREFS_KEY = "flutter.pending_transactions"
+        const val PREFS_NAME = "NativePendingTransactions"
+        const val PREFS_KEY = "pending_transactions"
     }
 
     override fun onListenerConnected() {
@@ -23,6 +23,12 @@ class NotificationService : NotificationListenerService() {
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         android.util.Log.w("NotificationService", "Service disconnected")
+        requestRebind(
+            android.content.ComponentName(
+                this,
+                NotificationService::class.java,
+            ),
+        )
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -46,29 +52,32 @@ class NotificationService : NotificationListenerService() {
                 return
             }
 
-            android.util.Log.d("NotificationService", "Processing notification from $pkg")
-            val channel = MainActivity.notifChannel
+            android.util.Log.d("NotificationService", "Processing notification from $pkg title='$title'")
+            val parsed = parseTransaction(title, text, pkg)
+            if (parsed == null) {
+                android.util.Log.d("NotificationService", "Notification did not match transaction patterns; nothing stored")
+                return
+            }
 
-            if (channel != null) {
-                Handler(Looper.getMainLooper()).post {
-                    try {
-                        channel.invokeMethod(
-                            "onNotification",
-                            mapOf("pkg" to pkg, "title" to title, "text" to text),
-                        )
-                        android.util.Log.d("NotificationService", "Successfully sent notification to Flutter")
-                    } catch (e: Exception) {
-                        android.util.Log.e("NotificationService", "Failed to send notification to Flutter", e)
-                        val parsed = parseTransaction(title, text, pkg)
-                        if (parsed != null) {
-                            writeToSharedPrefs(parsed)
-                        }
-                    }
+            writeToSharedPrefs(parsed)
+
+            val channel = MainActivity.notifChannel
+            android.util.Log.d("NotificationService", "notifChannelAvailable=${channel != null}")
+            if (channel == null) {
+                android.util.Log.d("NotificationService", "Flutter channel unavailable; native storage retained transaction")
+                return
+            }
+
+            Handler(Looper.getMainLooper()).post {
+                try {
+                    channel.invokeMethod(
+                        "onNotification",
+                        mapOf("pkg" to pkg, "title" to title, "text" to text),
+                    )
+                    android.util.Log.d("NotificationService", "Successfully sent notification to Flutter")
+                } catch (e: Exception) {
+                    android.util.Log.e("NotificationService", "Failed to send notification to Flutter; native storage already contains transaction", e)
                 }
-            } else {
-                android.util.Log.d("NotificationService", "Flutter channel not available, writing to SharedPreferences")
-                val parsed = parseTransaction(title, text, pkg) ?: return
-                writeToSharedPrefs(parsed)
             }
         } catch (e: Exception) {
             android.util.Log.e("NotificationService", "Error processing notification", e)
@@ -95,11 +104,15 @@ class NotificationService : NotificationListenerService() {
             if (match != null) {
                 amount = match.groupValues[1].replace(",", "").toDoubleOrNull()
                 txType = type
+                android.util.Log.d("NotificationService", "Matched amount pattern='${pattern.pattern}' amount=$amount explicitType=$type")
                 break
             }
         }
 
-        if (amount == null || amount <= 0) return null
+        if (amount == null || amount <= 0) {
+            android.util.Log.d("NotificationService", "Failed to extract valid amount from body='$body'")
+            return null
+        }
 
         txType = txType ?: if (lower.contains("received") || lower.contains("credited")) {
             "income"
@@ -114,6 +127,8 @@ class NotificationService : NotificationListenerService() {
             merchantRegex.find(body)?.groupValues?.get(1)?.trim()
                 ?: appName(pkg)
                 ?: title
+
+        android.util.Log.d("NotificationService", "Parsed tx type=$txType amount=$amount description='$description'")
 
         val now = System.currentTimeMillis()
         val minuteBucket = now / 60_000
@@ -135,18 +150,30 @@ class NotificationService : NotificationListenerService() {
         try {
             val prefs = applicationContext.getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             val existing = prefs.getString(PREFS_KEY, null)
-            val list = if (existing != null) JSONArray(existing) else JSONArray()
+            val list = try {
+                if (existing != null && existing.trim().startsWith("[")) JSONArray(existing) else JSONArray()
+            } catch (e: Exception) {
+                android.util.Log.w("NotificationService", "Existing pending payload is not valid JSON array; resetting", e)
+                JSONArray()
+            }
+
+            android.util.Log.d("NotificationService", "writeToSharedPrefs existingCount=${list.length()}")
 
             val newPrefix = tx.getString("id").split("_").first()
             for (i in 0 until list.length()) {
                 val stored = JSONObject(list.getString(i))
-                if (stored.getString("id").startsWith(newPrefix)) return
+                if (stored.getString("id").startsWith(newPrefix)) {
+                    android.util.Log.d("NotificationService", "Skipping duplicate pending tx prefix=$newPrefix")
+                    return
+                }
             }
 
             list.put(tx.toString())
             val success = prefs.edit().putString(PREFS_KEY, list.toString()).commit()
             if (!success) {
                 android.util.Log.e("NotificationService", "Failed to write transaction to SharedPreferences")
+            } else {
+                android.util.Log.d("NotificationService", "Stored pending tx id=${tx.optString("id")} newCount=${list.length()}")
             }
         } catch (e: Exception) {
             android.util.Log.e("NotificationService", "Error writing transaction to SharedPreferences", e)

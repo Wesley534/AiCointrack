@@ -43,6 +43,8 @@ void main() async {
   // lazily the first time LoginPage builds — see LoginPage._initReown().
   // BaseAuthService has no async init — it is fully stateless.
 
+  await PendingTxService.syncOnStartup();
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -54,8 +56,13 @@ void main() async {
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class _NavLogObserver extends NavigatorObserver {
-  void _log(String action, Route<dynamic>? route, Route<dynamic>? previousRoute) {
-    final toName = route?.settings.name ?? route?.runtimeType.toString() ?? 'null';
+  void _log(
+    String action,
+    Route<dynamic>? route,
+    Route<dynamic>? previousRoute,
+  ) {
+    final toName =
+        route?.settings.name ?? route?.runtimeType.toString() ?? 'null';
     final fromName =
         previousRoute?.settings.name ??
         previousRoute?.runtimeType.toString() ??
@@ -130,7 +137,6 @@ class _AuthGateState extends State<AuthGate> {
     debugPrint('[AuthGate] initState');
     unawaited(_initAuthGate());
     _initNotificationListener();
-    PendingTxService.syncOnStartup();
   }
 
   Future<void> _initAuthGate() async {
@@ -154,27 +160,33 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     debugPrint('[AuthGate] Subscribing to appAuthStateChanges');
-    _authSub = AuthService.appAuthStateChanges().listen((isAuth) async {
-      debugPrint('[AuthGate] appAuthStateChanges emitted isAuth=$isAuth');
-      if (!mounted) return;
+    _authSub = AuthService.appAuthStateChanges().listen(
+      (isAuth) async {
+        debugPrint('[AuthGate] appAuthStateChanges emitted isAuth=$isAuth');
+        if (!mounted) return;
 
-      final previous = _isAuthenticated;
-      if (previous != isAuth) {
-        debugPrint('[AuthGate] UI auth state transition $previous -> $isAuth');
-      }
+        final previous = _isAuthenticated;
+        if (previous != isAuth) {
+          debugPrint(
+            '[AuthGate] UI auth state transition $previous -> $isAuth',
+          );
+        }
 
-      setState(() {
-        _isAuthenticated = isAuth;
-      });
+        setState(() {
+          _isAuthenticated = isAuth;
+        });
 
-      if (isAuth) {
-        await _maybeShowPermissionScreen();
-      }
-    }, onError: (Object e, StackTrace st) {
-      debugPrint('[AuthGate] appAuthStateChanges error: $e');
-    }, onDone: () {
-      debugPrint('[AuthGate] appAuthStateChanges stream done');
-    });
+        if (isAuth) {
+          await _maybeShowPermissionScreen();
+        }
+      },
+      onError: (Object e, StackTrace st) {
+        debugPrint('[AuthGate] appAuthStateChanges error: $e');
+      },
+      onDone: () {
+        debugPrint('[AuthGate] appAuthStateChanges stream done');
+      },
+    );
   }
 
   @override
@@ -242,9 +254,7 @@ class _AuthGateState extends State<AuthGate> {
         backgroundColor: AppTheme.darkTheme.scaffoldBackgroundColor,
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(
-              AppColors.accent,
-            ),
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
           ),
         ),
       );

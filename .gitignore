@@ -33,6 +33,7 @@ backend/__pycache__/
 backend/*.py[cod]
 backend/*.sqlite3
 backend/*.db
+.codex
 
 # Mobile specific
 mobile/aicointrack/build/
@@ -59,3 +60,4 @@ coverage/
 
 docs/
 AUTH_ARCHITECTURE.md
+designs/

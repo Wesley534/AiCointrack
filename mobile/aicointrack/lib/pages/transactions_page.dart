@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../config/theme.dart';
 import '../services/api_service.dart';
 import '../services/pending_transactions_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/design_system.dart';
 import 'add_transaction_sheet.dart';
-import 'pending_transactions_page.dart';
 
-/// Transactions list page – shows recent transactions with filters.
 class TransactionsPage extends StatefulWidget {
   const TransactionsPage({super.key});
 
@@ -17,8 +17,10 @@ class TransactionsPage extends StatefulWidget {
 class _TransactionsPageState extends State<TransactionsPage> {
   bool _isLoading = true;
   String? _error;
-  List<dynamic> _data = [];
+  List<Map<String, dynamic>> _data = [];
+  List<PendingTx> _pendingTxs = [];
   String _activeFilter = 'all';
+  final Set<String> _busyIds = <String>{};
 
   @override
   void initState() {
@@ -27,30 +29,31 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Future<void> _loadData() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final result = await ApiService.fetchTransactions(
         limit: 50,
         source: _apiSourceForFilter(_activeFilter),
       );
-      if (mounted) {
-        setState(() {
-          _data = _applyClientFilter(result);
-          _isLoading = false;
-        });
-      }
+      final pending = await PendingTxService.getAll();
+
+      if (!mounted) return;
+      setState(() {
+        _data = _applyClientFilter(result);
+        _pendingTxs = pending;
+        _isLoading = false;
+      });
+      pendingCountNotifier.value = pending.length;
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+      });
     }
   }
 
@@ -65,10 +68,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
     }
   }
 
-  List<dynamic> _applyClientFilter(List<dynamic> items) {
-    if (_activeFilter != 'auto') {
-      return items;
-    }
+  List<Map<String, dynamic>> _applyClientFilter(List<Map<String, dynamic>> items) {
+    if (_activeFilter != 'auto') return items;
     return items.where((item) {
       final source = (item['source'] ?? '').toString().toLowerCase();
       return source != 'onchain' && source != 'cash';
@@ -84,158 +85,128 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Future<void> _setFilter(String filter) async {
-    if (mounted) {
-      setState(() {
-        _activeFilter = filter;
-      });
-    }
+    setState(() => _activeFilter = filter);
     await _loadData();
   }
 
-  String _emojiForSource(String source) {
-    switch (source.toLowerCase()) {
-      case 'mpesa':
-        return '📱';
-      case 'onchain':
-        return '⛓️';
-      case 'bank':
-        return '🏦';
-      case 'cash':
-      default:
-        return '💵';
+  Future<void> _dismissPending(PendingTx tx) async {
+    if (_busyIds.contains(tx.id)) return;
+    setState(() => _busyIds.add(tx.id));
+
+    try {
+      await PendingTxService.remove(tx.id);
+      if (!mounted) return;
+      setState(() {
+        _pendingTxs.removeWhere((item) => item.id == tx.id);
+      });
+      pendingCountNotifier.value = _pendingTxs.length;
+      _showMessage('Transaction dismissed');
+    } catch (e) {
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _busyIds.remove(tx.id));
+      }
     }
+  }
+
+  Future<void> _approvePending(PendingTx tx) async {
+    if (_busyIds.contains(tx.id)) return;
+    setState(() => _busyIds.add(tx.id));
+
+    try {
+      await ApiService.recordOffchainTransaction(
+        description: tx.description,
+        amount: tx.amount,
+        source: _sourceForApi(tx.source),
+        transactionType: tx.type,
+        category: tx.category,
+      );
+      await PendingTxService.remove(tx.id);
+
+      if (!mounted) return;
+      setState(() {
+        _pendingTxs.removeWhere((item) => item.id == tx.id);
+      });
+      pendingCountNotifier.value = _pendingTxs.length;
+      _showMessage('Transaction logged');
+      await _loadData();
+    } catch (e) {
+      _showMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() => _busyIds.remove(tx.id));
+      }
+    }
+  }
+
+  String _sourceForApi(String source) {
+    final lower = source.toLowerCase();
+    if (lower.contains('m-pesa') || lower.contains('mpesa')) return 'mpesa';
+    if (lower.contains('bank')) return 'bank';
+    return 'cash';
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _displayAmount(Map<String, dynamic> item) {
     final amount = ((item['amount'] ?? 0) as num).toDouble();
-    final type = (item['transaction_type'] ?? 'expense')
-        .toString()
-        .toLowerCase();
+    final type = (item['transaction_type'] ?? 'expense').toString().toLowerCase();
     return '${type == 'income' ? '+' : '-'}${Formatters.formatKes(amount)}';
   }
 
-  String _displaySource(String source) {
-    return source == 'onchain' ? 'chain' : source;
-  }
-
-  Widget _buildLoader(Color mutedColor) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.accent),
-          ),
-          const SizedBox(height: 12),
-          Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError(Color mutedColor) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
-          const SizedBox(height: 12),
-          Text(
-            _error!,
-            style: TextStyle(color: mutedColor, fontSize: 14),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmpty(Color mutedColor) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.only(top: 48),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('💸', style: TextStyle(fontSize: 40)),
-            const SizedBox(height: 12),
-            Text(
-              'No transactions yet',
-              style: TextStyle(color: mutedColor, fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _openAddSheet,
-              child: const Text('Add Transaction'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(
-    Color cardColor,
-    Color borderColor,
-    Color textColor,
-    Color mutedColor,
-  ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
+  @override
+  Widget build(BuildContext context) {
+    return AppPage(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Transactions',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Transaction Feed', style: Theme.of(context).textTheme.headlineMedium),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Review detected payments, track manual entries, and keep the ledger clean.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
               ),
-              OutlinedButton(
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
                 onPressed: _openAddSheet,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.accent,
-                  side: BorderSide(color: borderColor),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                ),
-                child: const Text('+ Add', style: TextStyle(fontSize: 12)),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add'),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 18),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _FilterChip(
+                _FilterPill(
                   label: 'All',
                   selected: _activeFilter == 'all',
                   onTap: () => _setFilter('all'),
                 ),
-                _FilterChip(
+                _FilterPill(
                   label: 'Auto-logged',
                   selected: _activeFilter == 'auto',
                   onTap: () => _setFilter('auto'),
                 ),
-                _FilterChip(
+                _FilterPill(
                   label: 'Onchain',
                   selected: _activeFilter == 'onchain',
                   onTap: () => _setFilter('onchain'),
                 ),
-                _FilterChip(
+                _FilterPill(
                   label: 'Manual',
                   selected: _activeFilter == 'manual',
                   onTap: () => _setFilter('manual'),
@@ -243,234 +214,294 @@ class _TransactionsPageState extends State<TransactionsPage> {
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          ValueListenableBuilder<int>(
-            valueListenable: pendingCountNotifier,
-            builder: (context, pendingCount, _) {
-              if (pendingCount <= 0) return const SizedBox.shrink();
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.danger.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.danger.withOpacity(0.2)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.pending_actions_outlined,
-                      color: AppColors.danger,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        '$pendingCount transaction${pendingCount == 1 ? '' : 's'} pending review',
-                        style: const TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PendingTransactionsPage(),
-                        ),
-                      ),
-                      child: const Text(
-                        'Review →',
-                        style: TextStyle(color: AppColors.danger, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          if (_data.isEmpty) _buildEmpty(mutedColor),
-          ..._data.map((raw) {
-            final item = Map<String, dynamic>.from(raw as Map);
-            final amount = _displayAmount(item);
-            final source = (item['source'] ?? '').toString();
-            final displaySource = _displaySource(source);
-            final isPositive = amount.startsWith('+');
-            return Column(
+          const SizedBox(height: 18),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 60),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_error != null)
+            AppGlassCard(
+              child: Column(
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.danger, size: 40),
+                  const SizedBox(height: 10),
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 14),
+                  ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
+                ],
+              ),
+            )
+          else ...[
+            if (_pendingTxs.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Pending Review', style: Theme.of(context).textTheme.titleLarge),
+                  AppPill(
+                    label: '${_pendingTxs.length} new',
+                    color: AppColors.danger,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ..._pendingTxs.map(_buildPendingCard),
+              const SizedBox(height: 18),
+            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: cardColor,
-                              border: Border.all(color: borderColor),
-                            ),
-                            child: Center(
-                              child: Text(
-                                _emojiForSource(source),
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  (item['description'] ?? 'Transaction')
-                                      .toString(),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: textColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Row(
-                                  children: [
-                                    Text(
-                                      Formatters.formatDate(
-                                        item['created_at']?.toString(),
-                                      ),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: mutedColor,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    if (displaySource == 'chain')
-                                      const _SourcePill(
-                                        text: 'Onchain',
-                                        color: AppColors.accent,
-                                      ),
-                                    if (displaySource == 'cash')
-                                      const _SourcePill(text: 'Manual'),
-                                    if (displaySource != 'cash' &&
-                                        displaySource != 'chain' &&
-                                        displaySource.isNotEmpty)
-                                      _SourcePill(text: displaySource),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      amount,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: isPositive
-                            ? AppColors.positive
-                            : AppColors.danger,
-                      ),
-                    ),
-                  ],
+                Text('Activity', style: Theme.of(context).textTheme.titleLarge),
+                Text(
+                  '${_data.length} items',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                const SizedBox(height: 10),
-                Divider(height: 1, color: borderColor),
-                const SizedBox(height: 10),
               ],
-            );
-          }),
+            ),
+            const SizedBox(height: 12),
+            if (_data.isEmpty)
+              const AppGlassCard(
+                child: Text('No transactions yet. Add one to start building your activity feed.'),
+              )
+            else
+              ..._data.map(_buildTransactionCard),
+          ],
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
-    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+  Widget _buildPendingCard(PendingTx tx) {
+    final isIncome = tx.type == 'income';
+    final busy = _busyIds.contains(tx.id);
+    final iconData = _iconForSource(tx.source);
 
-    return Container(
-      color: bgColor,
-      child: _isLoading
-          ? _buildLoader(mutedColor)
-          : _error != null
-          ? _buildError(mutedColor)
-          : _buildContent(cardColor, borderColor, textColor, mutedColor),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppGlassCard(
+        radius: 24,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppIconBadge(
+                  icon: iconData.$1,
+                  background: iconData.$2,
+                  foreground: iconData.$3,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tx.description, style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${tx.source} · ${_formatRelativeDate(tx.detectedAt)}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${isIncome ? '+' : '-'}${Formatters.formatKes(tx.amount)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: isIncome ? AppColors.positive : AppColors.danger,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            AppPill(label: tx.category, color: AppColors.purple),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: busy ? null : () => _dismissPending(tx),
+                    child: const Text('Dismiss'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: busy ? null : () => _approvePending(tx),
+                    child: busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Approve'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildTransactionCard(Map<String, dynamic> item) {
+    final source = (item['source'] ?? '').toString();
+    final amount = _displayAmount(item);
+    final iconData = _iconForSource(source);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: AppGlassCard(
+        radius: 24,
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            AppIconBadge(
+              icon: iconData.$1,
+              background: iconData.$2,
+              foreground: iconData.$3,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (item['description'] ?? 'Transaction').toString(),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          Formatters.formatDate(item['created_at']?.toString()),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      AppPill(
+                        label: _sourceLabel(source),
+                        color: _sourceTone(source),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              amount,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: amount.startsWith('+') ? AppColors.positive : AppColors.danger,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  (IconData, Color, Color) _iconForSource(String source) {
+    switch (source.toLowerCase()) {
+      case 'mpesa':
+      case 'm-pesa':
+        return (
+          Icons.sms_rounded,
+          AppColors.greenBg.withValues(alpha: 0.28),
+          AppColors.positive,
+        );
+      case 'bank':
+      case 'kcb bank':
+      case 'equity bank':
+      case 'ncba bank':
+        return (
+          Icons.account_balance_rounded,
+          AppColors.indigoBg.withValues(alpha: 0.45),
+          AppColors.accent,
+        );
+      case 'onchain':
+        return (
+          Icons.currency_bitcoin_rounded,
+          AppColors.amberBg.withValues(alpha: 0.45),
+          AppColors.purple,
+        );
+      default:
+        return (
+          Icons.payments_outlined,
+          AppColors.indigoBg.withValues(alpha: 0.35),
+          AppColors.lightText,
+        );
+    }
+  }
+
+  String _sourceLabel(String source) {
+    switch (source.toLowerCase()) {
+      case 'onchain':
+        return 'On-chain';
+      case 'cash':
+        return 'Manual';
+      case 'mpesa':
+      case 'm-pesa':
+        return 'Auto';
+      default:
+        return source.isEmpty ? 'Activity' : source;
+    }
+  }
+
+  Color _sourceTone(String source) {
+    switch (source.toLowerCase()) {
+      case 'onchain':
+        return AppColors.accent;
+      case 'cash':
+        return AppColors.purple;
+      case 'mpesa':
+      case 'm-pesa':
+        return AppColors.positive;
+      default:
+        return AppColors.purple;
+    }
+  }
+
+  String _formatRelativeDate(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterChip({
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: selected ? AppColors.accent : mutedColor,
-          side: BorderSide(color: selected ? AppColors.accent : borderColor),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: AppPill(
+          label: label,
+          color: selected ? AppColors.accent : AppColors.purple,
+          filled: selected,
         ),
-        child: Text(label, style: const TextStyle(fontSize: 12)),
       ),
-    );
-  }
-}
-
-class _SourcePill extends StatelessWidget {
-  final String text;
-  final Color? color;
-
-  const _SourcePill({required this.text, this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final textColor =
-        color ?? (isDark ? AppColors.darkMuted : AppColors.lightMuted);
-
-    return Container(
-      margin: const EdgeInsets.only(left: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
-        color: bgColor,
-        border: Border.all(color: borderColor),
-      ),
-      child: Text(text, style: TextStyle(fontSize: 9, color: textColor)),
     );
   }
 }
