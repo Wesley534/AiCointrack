@@ -5,6 +5,7 @@ import '../config/theme.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/local_db_service.dart';
 import '../services/pending_transactions_service.dart';
 import '../utils/formatters.dart';
 import '../widgets/design_system.dart';
@@ -37,6 +38,8 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentNavIndex = 0;
   bool _summaryLoading = true;
+  bool _isRefreshing = false;
+  bool _isStale = true;
   String? _summaryError;
   Map<String, dynamic> _summary = {};
   List<Map<String, dynamic>> _budgetCategories = [];
@@ -51,24 +54,58 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _loadDashboardData() async {
+    final cachedSummary = await ApiService.fetchCachedDashboardSummary();
+    final cachedWallet = await ApiService.fetchCachedWalletBalance();
+    final cachedBudgets = await ApiService.fetchCachedBudget();
+    final cachedTransactions = await ApiService.fetchCachedTransactions(
+      limit: 4,
+    );
+    final cachedShoppingLists = await ApiService.fetchCachedShoppingLists();
+    final cachedSavingsGoals = await ApiService.fetchCachedSavingsGoals();
+    final staleFlags = await Future.wait<bool>([
+      LocalDbService.instance.isCacheStale('dashboard_summary'),
+      LocalDbService.instance.isCacheStale('wallet_balance'),
+      LocalDbService.instance.isCacheStale('budgets'),
+      LocalDbService.instance.isCacheStale('shopping_lists'),
+      LocalDbService.instance.isCacheStale('savings_goals'),
+    ]);
+
+    final hasCachedData =
+        cachedSummary.isNotEmpty ||
+        cachedWallet.isNotEmpty ||
+        cachedBudgets.isNotEmpty ||
+        cachedTransactions.isNotEmpty ||
+        cachedShoppingLists.isNotEmpty ||
+        cachedSavingsGoals.isNotEmpty;
+
     setState(() {
-      _summaryLoading = true;
+      _summary = {...cachedSummary, ...cachedWallet};
+      _budgetCategories = cachedBudgets;
+      _recentTransactions = cachedTransactions;
+      _shoppingLists = cachedShoppingLists;
+      _savingsGoals = cachedSavingsGoals;
+      _summaryLoading = !hasCachedData;
+      _isRefreshing = hasCachedData;
+      _isStale = staleFlags.any((flag) => flag);
       _summaryError = null;
     });
 
     try {
       final topLevel = await Future.wait<dynamic>([
-        ApiService.fetchDashboardSummaryFromApi(),
-        ApiService.fetchWalletBalance(),
+        ApiService.refreshDashboardSummaryCache(),
+        ApiService.refreshWalletBalanceCache(),
       ]);
       final detail = await Future.wait<dynamic>([
-        ApiService.fetchCurrentBudget(),
-        ApiService.fetchTransactions(limit: 4),
-        ApiService.fetchShoppingListsFromApi(),
-        ApiService.fetchSavingsGoalsFromApi(),
+        ApiService.refreshBudgetCache(),
+        ApiService.fetchTransactionsFromApi(limit: 4),
+        ApiService.refreshShoppingListsCache(),
+        ApiService.refreshSavingsGoalsCache(),
       ]);
 
       if (!mounted) return;
+      await LocalDbService.instance.upsertServerTransactions(
+        (detail[1] as List).cast<Map<String, dynamic>>(),
+      );
       setState(() {
         _summary = {
           ...(topLevel[0] as Map<String, dynamic>),
@@ -79,12 +116,17 @@ class _DashboardPageState extends State<DashboardPage> {
         _shoppingLists = (detail[2] as List).cast<Map<String, dynamic>>();
         _savingsGoals = (detail[3] as List).cast<Map<String, dynamic>>();
         _summaryLoading = false;
+        _isRefreshing = false;
+        _isStale = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _summaryError = e.toString().replaceFirst('Exception: ', '');
+        if (!hasCachedData) {
+          _summaryError = e.toString().replaceFirst('Exception: ', '');
+        }
         _summaryLoading = false;
+        _isRefreshing = false;
       });
     }
   }
@@ -325,6 +367,25 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_summary.isNotEmpty ||
+              _budgetCategories.isNotEmpty ||
+              _recentTransactions.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_isRefreshing)
+                    const AppPill(label: 'Refreshing', color: AppColors.accent),
+                  if (_isStale)
+                    const AppPill(
+                      label: 'Showing cached dashboard',
+                      color: AppColors.warning,
+                    ),
+                ],
+              ),
+            ),
           AppGlassCard(
             padding: const EdgeInsets.all(24),
             child: Column(

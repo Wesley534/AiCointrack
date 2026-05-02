@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
 import '../services/pending_transactions_service.dart';
+import '../services/sync_service.dart';
 import '../utils/formatters.dart';
 import '../widgets/design_system.dart';
 import 'add_transaction_sheet.dart';
@@ -16,11 +17,14 @@ class TransactionsPage extends StatefulWidget {
 
 class _TransactionsPageState extends State<TransactionsPage> {
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String? _error;
   List<Map<String, dynamic>> _data = [];
   List<PendingTx> _pendingTxs = [];
   String _activeFilter = 'all';
   final Set<String> _busyIds = <String>{};
+  DateTime? _lastSyncedAt;
+  bool _isCacheStale = true;
 
   @override
   void initState() {
@@ -29,30 +33,50 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   Future<void> _loadData() async {
+    final source = _apiSourceForFilter(_activeFilter);
+    final cached = await ApiService.fetchCachedTransactions(
+      limit: 50,
+      source: source,
+    );
+    final pending = await PendingTxService.getAll();
+    final lastSyncedAt = await ApiService.getTransactionsLastSyncedAt();
+    final isCacheStale = await ApiService.isTransactionsCacheStale();
+
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _data = _applyClientFilter(cached);
+      _pendingTxs = pending;
+      _lastSyncedAt = lastSyncedAt;
+      _isCacheStale = isCacheStale;
+      _isLoading = cached.isEmpty;
+      _isRefreshing = cached.isNotEmpty;
       _error = null;
     });
 
     try {
-      final result = await ApiService.fetchTransactions(
+      final result = await ApiService.refreshTransactionsCache(
         limit: 50,
-        source: _apiSourceForFilter(_activeFilter),
+        source: source,
       );
-      final pending = await PendingTxService.getAll();
 
       if (!mounted) return;
       setState(() {
         _data = _applyClientFilter(result);
         _pendingTxs = pending;
+        _lastSyncedAt = DateTime.now().toUtc();
+        _isCacheStale = false;
         _isLoading = false;
+        _isRefreshing = false;
       });
       pendingCountNotifier.value = pending.length;
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        if (_data.isEmpty) {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        }
         _isLoading = false;
+        _isRefreshing = false;
       });
     }
   }
@@ -68,7 +92,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
     }
   }
 
-  List<Map<String, dynamic>> _applyClientFilter(List<Map<String, dynamic>> items) {
+  List<Map<String, dynamic>> _applyClientFilter(
+    List<Map<String, dynamic>> items,
+  ) {
     if (_activeFilter != 'auto') return items;
     return items.where((item) {
       final source = (item['source'] ?? '').toString().toLowerCase();
@@ -87,6 +113,13 @@ class _TransactionsPageState extends State<TransactionsPage> {
   Future<void> _setFilter(String filter) async {
     setState(() => _activeFilter = filter);
     await _loadData();
+  }
+
+  Future<void> _manualSync() async {
+    await SyncService.instance.syncAll(trigger: 'transactions_manual');
+    await _loadData();
+    if (!mounted) return;
+    _showMessage('Transactions synced');
   }
 
   Future<void> _dismissPending(PendingTx tx) async {
@@ -148,12 +181,16 @@ class _TransactionsPageState extends State<TransactionsPage> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _displayAmount(Map<String, dynamic> item) {
     final amount = ((item['amount'] ?? 0) as num).toDouble();
-    final type = (item['transaction_type'] ?? 'expense').toString().toLowerCase();
+    final type = (item['transaction_type'] ?? 'expense')
+        .toString()
+        .toLowerCase();
     return '${type == 'income' ? '+' : '-'}${Formatters.formatKes(amount)}';
   }
 
@@ -169,7 +206,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Transaction Feed', style: Theme.of(context).textTheme.headlineMedium),
+                    Text(
+                      'Transaction Feed',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       'Review detected payments, track manual entries, and keep the ledger clean.',
@@ -177,6 +217,12 @@ class _TransactionsPageState extends State<TransactionsPage> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: _manualSync,
+                icon: const Icon(Icons.sync_rounded),
+                label: const Text('Sync'),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
@@ -215,6 +261,26 @@ class _TransactionsPageState extends State<TransactionsPage> {
             ),
           ),
           const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (_lastSyncedAt != null)
+                AppPill(
+                  label:
+                      'Last sync ${_formatRelativeDate(_lastSyncedAt!.toLocal())}',
+                  color: AppColors.accent,
+                ),
+              if (_isRefreshing)
+                const AppPill(label: 'Refreshing', color: AppColors.accent),
+              if (_isCacheStale)
+                const AppPill(
+                  label: 'Offline or stale cache',
+                  color: AppColors.warning,
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.only(top: 60),
@@ -224,11 +290,18 @@ class _TransactionsPageState extends State<TransactionsPage> {
             AppGlassCard(
               child: Column(
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.danger, size: 40),
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.danger,
+                    size: 40,
+                  ),
                   const SizedBox(height: 10),
                   Text(_error!, textAlign: TextAlign.center),
                   const SizedBox(height: 14),
-                  ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
+                  ElevatedButton(
+                    onPressed: _loadData,
+                    child: const Text('Retry'),
+                  ),
                 ],
               ),
             )
@@ -237,7 +310,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Pending Review', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Pending Review',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   AppPill(
                     label: '${_pendingTxs.length} new',
                     color: AppColors.danger,
@@ -261,7 +337,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
             const SizedBox(height: 12),
             if (_data.isEmpty)
               const AppGlassCard(
-                child: Text('No transactions yet. Add one to start building your activity feed.'),
+                child: Text(
+                  'No transactions yet. Add one to start building your activity feed.',
+                ),
               )
             else
               ..._data.map(_buildTransactionCard),
@@ -297,7 +375,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tx.description, style: Theme.of(context).textTheme.titleMedium),
+                      Text(
+                        tx.description,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         '${tx.source} · ${_formatRelativeDate(tx.detectedAt)}',
@@ -334,7 +415,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Approve'),
                   ),
@@ -388,6 +472,10 @@ class _TransactionsPageState extends State<TransactionsPage> {
                         label: _sourceLabel(source),
                         color: _sourceTone(source),
                       ),
+                      const SizedBox(width: 8),
+                      _SyncStatusPill(
+                        status: (item['sync_status'] ?? 'synced').toString(),
+                      ),
                     ],
                   ),
                 ],
@@ -397,7 +485,9 @@ class _TransactionsPageState extends State<TransactionsPage> {
             Text(
               amount,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: amount.startsWith('+') ? AppColors.positive : AppColors.danger,
+                color: amount.startsWith('+')
+                    ? AppColors.positive
+                    : AppColors.danger,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -475,6 +565,23 @@ class _TransactionsPageState extends State<TransactionsPage> {
     if (diff.inDays < 1) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${dt.day}/${dt.month}/${dt.year}';
+  }
+}
+
+class _SyncStatusPill extends StatelessWidget {
+  const _SyncStatusPill({required this.status});
+
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = status.toLowerCase();
+    final color = switch (normalized) {
+      'pending' => AppColors.warning,
+      'failed' => AppColors.danger,
+      _ => AppColors.positive,
+    };
+    return AppPill(label: normalized, color: color);
   }
 }
 

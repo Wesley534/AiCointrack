@@ -24,7 +24,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   bool _isSubmitting = false;
   String? _error;
 
-  static const _categories = [
+  static const _defaultCategories = [
     'General',
     'Food',
     'Transport',
@@ -36,12 +36,30 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   ];
 
   static const _sources = ['cash', 'mpesa', 'bank'];
+  List<String> _categories = List<String>.from(_defaultCategories);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
 
   @override
   void dispose() {
     _descCtrl.dispose();
     _amountCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadCategories() async {
+    final cached = await ApiService.fetchCachedCategories();
+    if (!mounted || cached.isEmpty) return;
+    setState(() {
+      _categories = cached;
+      if (!_categories.contains(_category)) {
+        _category = _categories.first;
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -82,6 +100,11 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
       if (mounted) {
         Navigator.of(context).pop();
         widget.onSuccess();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saved locally. Sync will continue when available.'),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

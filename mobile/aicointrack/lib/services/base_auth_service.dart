@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
+import 'local_auth_lock_service.dart';
 import 'token_service.dart';
 import '../main.dart' show navigatorKey;
 import '../pages/home_page.dart';
@@ -88,8 +89,12 @@ class BaseAuthService {
         'messageLen=${message.length} signatureLen=${signature.length}',
       );
       if (signature.isNotEmpty) {
-        final head = signature.length > 12 ? signature.substring(0, 12) : signature;
-        final tail = signature.length > 12 ? signature.substring(signature.length - 8) : '';
+        final head = signature.length > 12
+            ? signature.substring(0, 12)
+            : signature;
+        final tail = signature.length > 12
+            ? signature.substring(signature.length - 8)
+            : '';
         debugPrint('BaseAuth: signature head=$head tail=$tail');
       }
 
@@ -127,6 +132,8 @@ class BaseAuthService {
         );
       }
 
+      await LocalAuthLockService.requestPinSetupPrompt();
+
       // ── 6. Force navigation regardless of stream timing ──────────────────────
       final ctx = navigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
@@ -134,7 +141,9 @@ class BaseAuthService {
           'BaseAuth: forcing navigation to HomePage using navigatorKey',
         );
         navigatorKey.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
+          MaterialPageRoute(
+            builder: (_) => const HomePage(promptForPinSetup: true),
+          ),
           (route) => false,
         );
       } else {

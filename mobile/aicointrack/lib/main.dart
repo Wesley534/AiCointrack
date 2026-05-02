@@ -9,10 +9,14 @@ import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'pages/notification_permission_screen.dart';
 import 'services/auth_service.dart';
+import 'services/local_auth_lock_service.dart';
+import 'services/local_db_service.dart';
 import 'services/notification_transaction_service.dart';
 import 'services/pending_transactions_service.dart';
+import 'services/sync_service.dart';
 import 'services/token_service.dart';
 import 'pages/home_page.dart';
+import 'pages/pin_unlock_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
 
@@ -43,7 +47,7 @@ void main() async {
   // lazily the first time LoginPage builds — see LoginPage._initReown().
   // BaseAuthService has no async init — it is fully stateless.
 
-  await PendingTxService.syncOnStartup();
+  await LocalAuthLockService.initialize();
 
   runApp(
     ChangeNotifierProvider(
@@ -51,6 +55,14 @@ void main() async {
       child: const MyApp(),
     ),
   );
+
+  unawaited(_warmStartupServices());
+}
+
+Future<void> _warmStartupServices() async {
+  await LocalDbService.instance.init();
+  await PendingTxService.syncOnStartup();
+  await SyncService.instance.initialize();
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -129,12 +141,17 @@ class _AuthGateState extends State<AuthGate> {
   final Set<int> _seenHashes = <int>{};
   StreamSubscription<bool>? _authSub;
   bool? _isAuthenticated;
+  bool _isLocallyLocked = false;
   String? _lastRenderedState;
 
   @override
   void initState() {
     super.initState();
     debugPrint('[AuthGate] initState');
+    _isLocallyLocked = LocalAuthLockService.isLocked;
+    LocalAuthLockService.lockStateListenable.addListener(
+      _handleLockStateChanged,
+    );
     unawaited(_initAuthGate());
     _initNotificationListener();
   }
@@ -144,14 +161,16 @@ class _AuthGateState extends State<AuthGate> {
     final hasJwt = jwt != null && jwt.isNotEmpty;
     final hasFirebaseUser = AuthService.isUserSignedIn();
     final initialAuth = hasJwt || hasFirebaseUser;
+    final initialLocked = LocalAuthLockService.isLocked;
 
     debugPrint(
-      '[AuthGate] Initial auth resolved hasJwt=$hasJwt hasFirebaseUser=$hasFirebaseUser -> isAuth=$initialAuth',
+      '[AuthGate] Initial auth resolved hasJwt=$hasJwt hasFirebaseUser=$hasFirebaseUser locked=$initialLocked -> isAuth=$initialAuth',
     );
 
     if (mounted) {
       setState(() {
         _isAuthenticated = initialAuth;
+        _isLocallyLocked = initialLocked;
       });
     }
 
@@ -177,7 +196,10 @@ class _AuthGateState extends State<AuthGate> {
         });
 
         if (isAuth) {
+          await LocalAuthLockService.lockIfNeeded();
           await _maybeShowPermissionScreen();
+        } else {
+          await LocalAuthLockService.onSessionEnded();
         }
       },
       onError: (Object e, StackTrace st) {
@@ -191,8 +213,18 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   void dispose() {
+    LocalAuthLockService.lockStateListenable.removeListener(
+      _handleLockStateChanged,
+    );
     _authSub?.cancel();
     super.dispose();
+  }
+
+  void _handleLockStateChanged() {
+    if (!mounted) return;
+    setState(() {
+      _isLocallyLocked = LocalAuthLockService.isLocked;
+    });
   }
 
   Future<void> _maybeShowPermissionScreen() async {
@@ -261,6 +293,14 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (_isAuthenticated == true) {
+      if (_isLocallyLocked) {
+        if (_lastRenderedState != 'pin_unlock') {
+          _lastRenderedState = 'pin_unlock';
+          debugPrint('[AuthGate] Rendering PinUnlockPage');
+        }
+        return const PinUnlockPage();
+      }
+
       if (_lastRenderedState != 'home') {
         _lastRenderedState = 'home';
         debugPrint('[AuthGate] Rendering HomePage');

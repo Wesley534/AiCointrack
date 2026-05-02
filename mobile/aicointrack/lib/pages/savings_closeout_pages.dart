@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/design_system.dart';
 
 /// Savings goals page.
 class SavingsPage extends StatefulWidget {
@@ -13,6 +15,8 @@ class SavingsPage extends StatefulWidget {
 
 class _SavingsPageState extends State<SavingsPage> {
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _isStale = true;
   String? _error;
   List<dynamic> _data = [];
 
@@ -23,25 +27,35 @@ class _SavingsPageState extends State<SavingsPage> {
   }
 
   Future<void> _loadData() async {
+    final cached = await ApiService.fetchCachedSavingsGoals();
+    final isStale = await LocalDbService.instance.isCacheStale('savings_goals');
     if (mounted) {
       setState(() {
-        _isLoading = true;
+        _data = cached;
+        _isLoading = cached.isEmpty;
+        _isRefreshing = cached.isNotEmpty;
+        _isStale = isStale;
         _error = null;
       });
     }
     try {
-      final result = await ApiService.fetchSavingsGoalsFromApi();
+      final result = await ApiService.refreshSavingsGoalsCache();
       if (mounted) {
         setState(() {
           _data = result;
           _isLoading = false;
+          _isRefreshing = false;
+          _isStale = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          if (_data.isEmpty) {
+            _error = e.toString().replaceFirst('Exception: ', '');
+          }
           _isLoading = false;
+          _isRefreshing = false;
         });
       }
     }
@@ -192,6 +206,26 @@ class _SavingsPageState extends State<SavingsPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  if (goals.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          if (_isRefreshing)
+                            const AppPill(
+                              label: 'Refreshing',
+                              color: AppColors.accent,
+                            ),
+                          if (_isStale)
+                            const AppPill(
+                              label: 'Showing cached goals',
+                              color: AppColors.warning,
+                            ),
+                        ],
+                      ),
+                    ),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
