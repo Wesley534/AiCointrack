@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/design_system.dart';
 
 void _shopLog(
   String scope,
@@ -32,6 +34,8 @@ class ShoppingListsPage extends StatefulWidget {
 
 class _ShoppingListsPageState extends State<ShoppingListsPage> {
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _isStale = true;
   String? _error;
   List<dynamic> _data = [];
 
@@ -50,13 +54,20 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
 
   Future<void> _loadData() async {
     _shopLog('ShoppingListsPage', '_loadData start mounted=$mounted');
+    final cached = await ApiService.fetchCachedShoppingLists();
+    final isStale = await LocalDbService.instance.isCacheStale(
+      'shopping_lists',
+    );
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _data = cached;
+      _isLoading = cached.isEmpty;
+      _isRefreshing = cached.isNotEmpty;
+      _isStale = isStale;
       _error = null;
     });
     try {
-      final result = await ApiService.fetchShoppingListsFromApi();
+      final result = await ApiService.refreshShoppingListsCache();
       _shopLog(
         'ShoppingListsPage',
         '_loadData success count=${result.length} mounted=$mounted',
@@ -65,6 +76,8 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
       setState(() {
         _data = result;
         _isLoading = false;
+        _isRefreshing = false;
+        _isStale = false;
       });
     } catch (e, st) {
       _shopLog(
@@ -75,8 +88,11 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
       );
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        if (_data.isEmpty) {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        }
         _isLoading = false;
+        _isRefreshing = false;
       });
     }
   }
@@ -257,6 +273,26 @@ class _ShoppingListsPageState extends State<ShoppingListsPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (_data.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (_isRefreshing)
+                          const AppPill(
+                            label: 'Refreshing',
+                            color: AppColors.accent,
+                          ),
+                        if (_isStale)
+                          const AppPill(
+                            label: 'Showing cached lists',
+                            color: AppColors.warning,
+                          ),
+                      ],
+                    ),
+                  ),
                 if (_data.isEmpty) _buildEmpty(scaffoldCtx, mutedColor),
                 ...(_data.map((raw) {
                   final list = Map<String, dynamic>.from(raw as Map);
@@ -609,6 +645,8 @@ class ShoppingDetailPage extends StatefulWidget {
 
 class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _isStale = true;
   String? _error;
   Map<String, dynamic> _data = {};
   final Set<int> _checked = {};
@@ -638,18 +676,30 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
       'ShoppingDetailPage',
       '_loadData start listId=${widget.listId} mounted=$mounted',
     );
+    final cached = await ApiService.fetchCachedShoppingListDetail(
+      widget.listId,
+    );
+    final cacheKey = 'shopping_detail_${widget.listId}';
+    final isStale = await LocalDbService.instance.isCacheStale(cacheKey);
     if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _data = cached;
+      _isLoading = cached.isEmpty;
+      _isRefreshing = cached.isNotEmpty;
+      _isStale = isStale;
       _error = null;
     });
     try {
-      final result = await ApiService.fetchShoppingListDetail(widget.listId);
+      final result = await ApiService.refreshShoppingListDetailCache(
+        widget.listId,
+      );
       _shopLog('ShoppingDetailPage', '_loadData success mounted=$mounted');
       if (!mounted) return;
       setState(() {
         _data = result;
         _isLoading = false;
+        _isRefreshing = false;
+        _isStale = false;
       });
     } catch (e, st) {
       _shopLog(
@@ -660,8 +710,11 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
       );
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        if (_data.isEmpty) {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        }
         _isLoading = false;
+        _isRefreshing = false;
       });
     }
   }
@@ -889,6 +942,26 @@ class _ShoppingDetailPageState extends State<ShoppingDetailPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (_data.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (_isRefreshing)
+                          const AppPill(
+                            label: 'Refreshing',
+                            color: AppColors.accent,
+                          ),
+                        if (_isStale)
+                          const AppPill(
+                            label: 'Showing cached details',
+                            color: AppColors.warning,
+                          ),
+                      ],
+                    ),
+                  ),
 
                 // ── Budget summary card ────────────────────────────────────
                 Container(

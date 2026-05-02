@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
 import '../widgets/design_system.dart';
 
@@ -14,6 +15,8 @@ class BudgetPage extends StatefulWidget {
 
 class _BudgetPageState extends State<BudgetPage> {
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _isStale = true;
   String? _error;
   List<Map<String, dynamic>> _data = [];
 
@@ -24,22 +27,35 @@ class _BudgetPageState extends State<BudgetPage> {
   }
 
   Future<void> _loadData() async {
+    final cached = await ApiService.fetchCachedBudget();
+    final isStale = await LocalDbService.instance.isCacheStale('budgets');
+
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _data = cached;
+      _isStale = isStale;
+      _isLoading = cached.isEmpty;
+      _isRefreshing = cached.isNotEmpty;
       _error = null;
     });
+
     try {
-      final result = await ApiService.fetchCurrentBudget();
+      final result = await ApiService.refreshBudgetCache();
       if (!mounted) return;
       setState(() {
         _data = result;
         _isLoading = false;
+        _isRefreshing = false;
+        _isStale = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
+        if (_data.isEmpty) {
+          _error = e.toString().replaceFirst('Exception: ', '');
+        }
         _isLoading = false;
+        _isRefreshing = false;
       });
     }
   }
@@ -54,10 +70,8 @@ class _BudgetPageState extends State<BudgetPage> {
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _BudgetSheet(
-        category: category,
-        currentMonth: _currentMonth(),
-      ),
+      builder: (_) =>
+          _BudgetSheet(category: category, currentMonth: _currentMonth()),
     );
 
     if (saved == true && mounted) {
@@ -77,7 +91,9 @@ class _BudgetPageState extends State<BudgetPage> {
       (sum, item) => sum + ((item['actual'] ?? 0) as num).toDouble(),
     );
     final remaining = totalPlanned - totalActual;
-    final usage = totalPlanned <= 0 ? 0.0 : (totalActual / totalPlanned).clamp(0, 1);
+    final usage = totalPlanned <= 0
+        ? 0.0
+        : (totalActual / totalPlanned).clamp(0, 1);
 
     return AppPage(
       child: Column(
@@ -90,7 +106,10 @@ class _BudgetPageState extends State<BudgetPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Monthly Budget', style: Theme.of(context).textTheme.headlineMedium),
+                    Text(
+                      'Monthly Budget',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       'Plan spending, track actuals, and adjust categories before the month closes.',
@@ -108,6 +127,23 @@ class _BudgetPageState extends State<BudgetPage> {
             ],
           ),
           const SizedBox(height: 18),
+          if (_data.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_isRefreshing)
+                    const AppPill(label: 'Refreshing', color: AppColors.accent),
+                  if (_isStale)
+                    const AppPill(
+                      label: 'Showing cached budget',
+                      color: AppColors.warning,
+                    ),
+                ],
+              ),
+            ),
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.only(top: 60),
@@ -117,11 +153,18 @@ class _BudgetPageState extends State<BudgetPage> {
             AppGlassCard(
               child: Column(
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.danger, size: 40),
+                  const Icon(
+                    Icons.error_outline,
+                    color: AppColors.danger,
+                    size: 40,
+                  ),
                   const SizedBox(height: 10),
                   Text(_error!, textAlign: TextAlign.center),
                   const SizedBox(height: 14),
-                  ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
+                  ElevatedButton(
+                    onPressed: _loadData,
+                    child: const Text('Retry'),
+                  ),
                 ],
               ),
             )
@@ -130,7 +173,10 @@ class _BudgetPageState extends State<BudgetPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Monthly Overview', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Monthly Overview',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 18),
                   Row(
                     children: [
@@ -149,7 +195,8 @@ class _BudgetPageState extends State<BudgetPage> {
                   ),
                   const SizedBox(height: 12),
                   AppGlassCard(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.28),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.28),
                     radius: 22,
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -159,14 +206,17 @@ class _BudgetPageState extends State<BudgetPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             AppPill(
-                              label: usage >= 0.9 ? 'Needs attention' : 'On track',
-                              color: usage >= 0.9 ? AppColors.danger : AppColors.positive,
+                              label: usage >= 0.9
+                                  ? 'Needs attention'
+                                  : 'On track',
+                              color: usage >= 0.9
+                                  ? AppColors.danger
+                                  : AppColors.positive,
                             ),
                             Text(
                               '${(usage * 100).toStringAsFixed(0)}% used',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: AppColors.accent,
-                              ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(color: AppColors.accent),
                             ),
                           ],
                         ),
@@ -175,7 +225,9 @@ class _BudgetPageState extends State<BudgetPage> {
                           value: usage.toDouble(),
                           minHeight: 10,
                           borderRadius: BorderRadius.circular(999),
-                          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             usage >= 0.9 ? AppColors.danger : AppColors.accent,
                           ),
@@ -202,7 +254,9 @@ class _BudgetPageState extends State<BudgetPage> {
             const SizedBox(height: 12),
             if (categories.isEmpty)
               const AppGlassCard(
-                child: Text('No budget categories yet. Add one to start tracking spend.'),
+                child: Text(
+                  'No budget categories yet. Add one to start tracking spend.',
+                ),
               )
             else
               ...categories.map(_buildCategoryCard),
@@ -267,15 +321,21 @@ class _BudgetPageState extends State<BudgetPage> {
                 value: pct.toDouble(),
                 minHeight: 9,
                 borderRadius: BorderRadius.circular(999),
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(over ? AppColors.danger : tone),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  over ? AppColors.danger : tone,
+                ),
               ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    over ? 'Over by ${Formatters.formatKes(actual - planned)}' : 'Left ${Formatters.formatKes(remaining)}',
+                    over
+                        ? 'Over by ${Formatters.formatKes(actual - planned)}'
+                        : 'Left ${Formatters.formatKes(remaining)}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: over ? AppColors.danger : tone,
                     ),
@@ -322,10 +382,7 @@ class _BudgetSheet extends StatefulWidget {
   final Map<String, dynamic>? category;
   final String currentMonth;
 
-  const _BudgetSheet({
-    required this.category,
-    required this.currentMonth,
-  });
+  const _BudgetSheet({required this.category, required this.currentMonth});
 
   @override
   State<_BudgetSheet> createState() => _BudgetSheetState();
@@ -347,15 +404,25 @@ class _BudgetSheetState extends State<_BudgetSheet> {
     super.initState();
     final category = widget.category;
     _isEditing = category != null;
-    _labelCtrl = TextEditingController(text: category?['label']?.toString() ?? '');
+    _labelCtrl = TextEditingController(
+      text: category?['label']?.toString() ?? '',
+    );
     _plannedCtrl = TextEditingController(
-      text: category == null ? '' : ((category['planned'] ?? 0) as num).toDouble().toStringAsFixed(0),
+      text: category == null
+          ? ''
+          : ((category['planned'] ?? 0) as num).toDouble().toStringAsFixed(0),
     );
     _actualCtrl = TextEditingController(
-      text: category == null ? '0' : ((category['actual'] ?? 0) as num).toDouble().toStringAsFixed(0),
+      text: category == null
+          ? '0'
+          : ((category['actual'] ?? 0) as num).toDouble().toStringAsFixed(0),
     );
-    _tagCtrl = TextEditingController(text: category?['tag']?.toString() ?? 'need');
-    _monthCtrl = TextEditingController(text: category?['month']?.toString() ?? widget.currentMonth);
+    _tagCtrl = TextEditingController(
+      text: category?['tag']?.toString() ?? 'need',
+    );
+    _monthCtrl = TextEditingController(
+      text: category?['month']?.toString() ?? widget.currentMonth,
+    );
     _kind = category?['kind']?.toString() ?? 'need';
   }
 
@@ -376,8 +443,14 @@ class _BudgetSheetState extends State<_BudgetSheet> {
     final tag = _tagCtrl.text.trim();
     final month = _monthCtrl.text.trim();
 
-    if (label.isEmpty || planned == null || planned <= 0 || tag.isEmpty || month.isEmpty) {
-      setState(() => _error = 'Please fill in all required fields with valid values.');
+    if (label.isEmpty ||
+        planned == null ||
+        planned <= 0 ||
+        tag.isEmpty ||
+        month.isEmpty) {
+      setState(
+        () => _error = 'Please fill in all required fields with valid values.',
+      );
       return;
     }
 
@@ -440,7 +513,10 @@ class _BudgetSheetState extends State<_BudgetSheet> {
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 18),
-          TextField(controller: _labelCtrl, decoration: const InputDecoration(labelText: 'Label')),
+          TextField(
+            controller: _labelCtrl,
+            decoration: const InputDecoration(labelText: 'Label'),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _plannedCtrl,
@@ -451,7 +527,9 @@ class _BudgetSheetState extends State<_BudgetSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _actualCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(labelText: 'Actual amount'),
             ),
           ],
@@ -471,14 +549,22 @@ class _BudgetSheetState extends State<_BudgetSheet> {
             decoration: const InputDecoration(labelText: 'Type'),
           ),
           const SizedBox(height: 12),
-          TextField(controller: _tagCtrl, decoration: const InputDecoration(labelText: 'Tag')),
+          TextField(
+            controller: _tagCtrl,
+            decoration: const InputDecoration(labelText: 'Tag'),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: _monthCtrl, decoration: const InputDecoration(labelText: 'Month')),
+          TextField(
+            controller: _monthCtrl,
+            decoration: const InputDecoration(labelText: 'Month'),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 10),
             Text(
               _error!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.danger),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.danger),
             ),
           ],
           const SizedBox(height: 18),
@@ -490,7 +576,10 @@ class _BudgetSheetState extends State<_BudgetSheet> {
                   ? const SizedBox(
                       height: 18,
                       width: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(_isEditing ? 'Save changes' : 'Create category'),
             ),

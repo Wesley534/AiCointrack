@@ -1,17 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import '../services/local_auth_lock_service.dart';
+import '../services/sync_service.dart';
 import '../services/token_service.dart';
 import '../config/theme.dart';
 import 'login_page.dart';
+import 'pin_setup_page.dart';
 import 'dashboard_page.dart';
 import 'wallet_options_page.dart';
 
 /// Home page displayed after successful authentication
 /// Registers user with backend and redirects to Dashboard
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({super.key, this.promptForPinSetup = false});
+
+  final bool promptForPinSetup;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -29,7 +36,25 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _user = AuthService.getCurrentUser();
     debugPrint('$_logTag initState firebaseUser=${_user?.uid}');
-    _registerUserWithBackend();
+    unawaited(_startFlow());
+  }
+
+  Future<void> _startFlow() async {
+    await LocalAuthLockService.markUnlocked();
+
+    final shouldPrompt = await LocalAuthLockService.shouldPromptForPinSetup(
+      forceAfterLogin: widget.promptForPinSetup,
+    );
+
+    if (shouldPrompt && mounted) {
+      final result = await Navigator.of(
+        context,
+      ).push<bool>(MaterialPageRoute(builder: (_) => const PinSetupPage()));
+      debugPrint('$_logTag pin setup result=$result');
+    }
+
+    await SyncService.instance.syncAll(trigger: 'home_open');
+    await _registerUserWithBackend();
   }
 
   /// Register or fetch user: Firebase path or JWT path (wallet-only).
@@ -43,12 +68,12 @@ class _HomePageState extends State<HomePage> {
       );
 
       Map<String, dynamic> backendResponse;
-      if (firebaseToken != null) {
-        debugPrint('$_logTag calling registerUserWithBackend()');
-        backendResponse = await ApiService.registerUserWithBackend();
-      } else if (jwt != null && jwt.isNotEmpty) {
+      if (jwt != null && jwt.isNotEmpty) {
         debugPrint('$_logTag calling fetchUserProfile()');
         backendResponse = await ApiService.fetchUserProfile();
+      } else if (firebaseToken != null) {
+        debugPrint('$_logTag calling registerUserWithBackend()');
+        backendResponse = await ApiService.registerUserWithBackend();
       } else {
         debugPrint('$_logTag no token available -> aborting register flow');
         return;
@@ -135,6 +160,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _handleSignOut() async {
     try {
       await AuthService.signOut();
+      await LocalAuthLockService.onSessionEnded();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -142,6 +168,7 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
@@ -164,9 +191,7 @@ class _HomePageState extends State<HomePage> {
               Column(
                 children: [
                   const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.accent,
-                    ),
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
                   ),
                   const SizedBox(height: 24),
                   Text(

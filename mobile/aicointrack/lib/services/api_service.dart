@@ -1,7 +1,8 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../services/auth_service.dart';
+import '../services/local_db_service.dart';
 import '../services/token_service.dart';
 import '../config/constants.dart';
 import '../config/theme.dart';
@@ -174,7 +175,7 @@ class ApiService {
   }
 
   /// Fetch user profile from backend. Uses JWT if available.
-  static Future<Map<String, dynamic>> fetchUserProfile() async {
+  static Future<Map<String, dynamic>> fetchUserProfileFromApi() async {
     try {
       var token = await TokenService.getJwt();
       if (token == null) {
@@ -205,6 +206,20 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to fetch user profile: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchUserProfile() async {
+    final cached = await LocalDbService.instance.getProfileBasics();
+    try {
+      final remote = await fetchUserProfileFromApi();
+      await LocalDbService.instance.upsertCache('profile', remote);
+      return remote;
+    } catch (e) {
+      if (cached.isNotEmpty) {
+        return cached;
+      }
+      rethrow;
     }
   }
 
@@ -240,7 +255,7 @@ class ApiService {
     );
   }
 
-  static Future<List<Map<String, dynamic>>> fetchTransactions({
+  static Future<List<Map<String, dynamic>>> fetchTransactionsFromApi({
     int limit = 50,
     String? source,
     String? transactionType,
@@ -277,7 +292,141 @@ class ApiService {
         .toList();
   }
 
+  static Future<List<Map<String, dynamic>>> fetchTransactions({
+    int limit = 50,
+    String? source,
+    String? transactionType,
+  }) async {
+    final local = await LocalDbService.instance.getTransactions(
+      syncedLimit: limit,
+      source: source,
+      transactionType: transactionType,
+    );
+
+    try {
+      final remote = await fetchTransactionsFromApi(
+        limit: limit,
+        source: source,
+        transactionType: transactionType,
+      );
+      await LocalDbService.instance.upsertServerTransactions(remote);
+      await LocalDbService.instance.upsertCache('transactions_meta', {
+        'last_synced_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      final categories = remote
+          .map((item) => (item['category'] ?? '').toString())
+          .where((item) => item.isNotEmpty);
+      await LocalDbService.instance.cacheCategories(categories);
+      return LocalDbService.instance.getTransactions(
+        syncedLimit: limit,
+        source: source,
+        transactionType: transactionType,
+      );
+    } catch (e) {
+      if (local.isNotEmpty) {
+        return local;
+      }
+      rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCachedTransactions({
+    int limit = 50,
+    String? source,
+    String? transactionType,
+  }) {
+    return LocalDbService.instance.getTransactions(
+      syncedLimit: limit,
+      source: source,
+      transactionType: transactionType,
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> refreshTransactionsCache({
+    int limit = 50,
+    String? source,
+    String? transactionType,
+  }) async {
+    final remote = await fetchTransactionsFromApi(
+      limit: limit,
+      source: source,
+      transactionType: transactionType,
+    );
+    await LocalDbService.instance.upsertServerTransactions(remote);
+    await LocalDbService.instance.upsertCache('transactions_meta', {
+      'last_synced_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    final categories = remote
+        .map((item) => (item['category'] ?? '').toString())
+        .where((item) => item.isNotEmpty);
+    await LocalDbService.instance.cacheCategories(categories);
+    return LocalDbService.instance.getTransactions(
+      syncedLimit: limit,
+      source: source,
+      transactionType: transactionType,
+    );
+  }
+
   static Future<Map<String, dynamic>> recordOffchainTransaction({
+    required String description,
+    required double amount,
+    required String source,
+    required String transactionType,
+    required String category,
+    String currency = 'KES',
+    String? referenceNumber,
+  }) async {
+    final localId = 'local_${DateTime.now().microsecondsSinceEpoch}';
+    final localTx = await LocalDbService.instance.insertPendingTransaction(
+      localId: localId,
+      amount: amount,
+      transactionType: transactionType,
+      description: description,
+      category: category,
+      source: source,
+    );
+
+    try {
+      final response = await _createOffchainTransactionOnBackend(
+        description: description,
+        amount: amount,
+        source: source,
+        transactionType: transactionType,
+        category: category,
+        currency: currency,
+        referenceNumber: referenceNumber,
+      );
+      await LocalDbService.instance.markTransactionSynced(
+        localId,
+        serverId: (response['id'] ?? '').toString(),
+        serverPayload: response,
+      );
+      return Map<String, dynamic>.from(response)
+        ..['local_id'] = localId
+        ..['sync_status'] = 'synced';
+    } catch (e) {
+      await LocalDbService.instance.markTransactionSyncStatus(
+        localId,
+        _isTransientNetworkError(e) ? 'pending' : 'failed',
+      );
+      return localTx;
+    }
+  }
+
+  static Future<Map<String, dynamic>> pushTransactionToBackend(
+    Map<String, dynamic> localTransaction,
+  ) {
+    return _createOffchainTransactionOnBackend(
+      description: (localTransaction['description'] ?? '').toString(),
+      amount: _readDouble(localTransaction['amount']),
+      source: (localTransaction['source'] ?? 'cash').toString(),
+      transactionType: (localTransaction['transaction_type'] ?? 'expense')
+          .toString(),
+      category: (localTransaction['category'] ?? 'General').toString(),
+    );
+  }
+
+  static Future<Map<String, dynamic>> _createOffchainTransactionOnBackend({
     required String description,
     required double amount,
     required String source,
@@ -313,7 +462,7 @@ class ApiService {
     return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
   }
 
-  static Future<List<Map<String, dynamic>>> fetchCurrentBudget() async {
+  static Future<List<Map<String, dynamic>>> fetchCurrentBudgetFromApi() async {
     final headers = await _authHeaders();
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/budgets/current'), headers: headers)
@@ -331,6 +480,38 @@ class ApiService {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCurrentBudget() async {
+    final cached = await LocalDbService.instance.getBudgetSummaries();
+    try {
+      final remote = await fetchCurrentBudgetFromApi();
+      await LocalDbService.instance.upsertCache('budgets', remote);
+      final categories = remote
+          .map((item) => (item['label'] ?? '').toString())
+          .where((item) => item.isNotEmpty);
+      await LocalDbService.instance.cacheCategories(categories);
+      return remote;
+    } catch (e) {
+      if (cached.isNotEmpty) {
+        return cached;
+      }
+      rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCachedBudget() {
+    return LocalDbService.instance.getBudgetSummaries();
+  }
+
+  static Future<List<Map<String, dynamic>>> refreshBudgetCache() async {
+    final remote = await fetchCurrentBudgetFromApi();
+    await LocalDbService.instance.upsertCache('budgets', remote);
+    final categories = remote
+        .map((item) => (item['label'] ?? '').toString())
+        .where((item) => item.isNotEmpty);
+    await LocalDbService.instance.cacheCategories(categories);
+    return remote;
   }
 
   static Future<Map<String, dynamic>> createBudget({
@@ -420,6 +601,27 @@ class ApiService {
         .toList();
   }
 
+  static Future<List<Map<String, dynamic>>>
+  fetchShoppingListsCachedFirst() async {
+    final cached = await fetchCachedShoppingLists();
+    try {
+      return await refreshShoppingListsCache();
+    } catch (e) {
+      if (cached.isNotEmpty) return cached;
+      rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCachedShoppingLists() {
+    return LocalDbService.instance.getCachedList('shopping_lists');
+  }
+
+  static Future<List<Map<String, dynamic>>> refreshShoppingListsCache() async {
+    final remote = await fetchShoppingListsFromApi();
+    await LocalDbService.instance.upsertCache('shopping_lists', remote);
+    return remote;
+  }
+
   static Future<Map<String, dynamic>> createShoppingList({
     required String name,
     required double budget,
@@ -439,10 +641,28 @@ class ApiService {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw _buildApiException(response);
     }
-    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+    final decoded = Map<String, dynamic>.from(
+      _decodeBody(response.body) as Map,
+    );
+    await refreshShoppingListsCache().catchError(
+      (_) => <Map<String, dynamic>>[],
+    );
+    return decoded;
   }
 
   static Future<Map<String, dynamic>> fetchShoppingListDetail(
+    int listId,
+  ) async {
+    final cached = await fetchCachedShoppingListDetail(listId);
+    try {
+      return await refreshShoppingListDetailCache(listId);
+    } catch (e) {
+      if (cached.isNotEmpty) return cached;
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchShoppingListDetailFromApi(
     int listId,
   ) async {
     final headers = await _authHeaders();
@@ -460,6 +680,23 @@ class ApiService {
       throw _buildApiException(response);
     }
     return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> fetchCachedShoppingListDetail(
+    int listId,
+  ) {
+    return LocalDbService.instance.getCachedMap('shopping_detail_$listId');
+  }
+
+  static Future<Map<String, dynamic>> refreshShoppingListDetailCache(
+    int listId,
+  ) async {
+    final remote = await fetchShoppingListDetailFromApi(listId);
+    await LocalDbService.instance.upsertCache(
+      'shopping_detail_$listId',
+      remote,
+    );
+    return remote;
   }
 
   static Future<Map<String, dynamic>> addShoppingItem(
@@ -483,7 +720,16 @@ class ApiService {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw _buildApiException(response);
     }
-    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+    final decoded = Map<String, dynamic>.from(
+      _decodeBody(response.body) as Map,
+    );
+    await refreshShoppingListDetailCache(
+      listId,
+    ).catchError((_) => <String, dynamic>{});
+    await refreshShoppingListsCache().catchError(
+      (_) => <Map<String, dynamic>>[],
+    );
+    return decoded;
   }
 
   static Future<List<Map<String, dynamic>>> fetchSavingsGoalsFromApi() async {
@@ -504,6 +750,27 @@ class ApiService {
         .whereType<Map>()
         .map((item) => Map<String, dynamic>.from(item))
         .toList();
+  }
+
+  static Future<List<Map<String, dynamic>>>
+  fetchSavingsGoalsCachedFirst() async {
+    final cached = await fetchCachedSavingsGoals();
+    try {
+      return await refreshSavingsGoalsCache();
+    } catch (e) {
+      if (cached.isNotEmpty) return cached;
+      rethrow;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchCachedSavingsGoals() {
+    return LocalDbService.instance.getCachedList('savings_goals');
+  }
+
+  static Future<List<Map<String, dynamic>>> refreshSavingsGoalsCache() async {
+    final remote = await fetchSavingsGoalsFromApi();
+    await LocalDbService.instance.upsertCache('savings_goals', remote);
+    return remote;
   }
 
   static Future<Map<String, dynamic>> createSavingsGoal(
@@ -531,7 +798,13 @@ class ApiService {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw _buildApiException(response);
     }
-    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+    final decoded = Map<String, dynamic>.from(
+      _decodeBody(response.body) as Map,
+    );
+    await refreshSavingsGoalsCache().catchError(
+      (_) => <Map<String, dynamic>>[],
+    );
+    return decoded;
   }
 
   static Future<Map<String, dynamic>> contributeToSavingsGoal(
@@ -554,10 +827,16 @@ class ApiService {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw _buildApiException(response);
     }
-    return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+    final decoded = Map<String, dynamic>.from(
+      _decodeBody(response.body) as Map,
+    );
+    await refreshSavingsGoalsCache().catchError(
+      (_) => <Map<String, dynamic>>[],
+    );
+    return decoded;
   }
 
-  static Future<Map<String, dynamic>> fetchDashboardSummaryFromApi() async {
+  static Future<Map<String, dynamic>> fetchDashboardSummaryRemote() async {
     final headers = await _authHeaders();
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/dashboard/summary'), headers: headers)
@@ -572,7 +851,31 @@ class ApiService {
     return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
   }
 
-  static Future<Map<String, dynamic>> fetchWalletBalance() async {
+  static Future<Map<String, dynamic>> fetchDashboardSummaryFromApi() async {
+    final cached = await LocalDbService.instance.getDashboardSummary();
+    try {
+      final remote = await fetchDashboardSummaryRemote();
+      await LocalDbService.instance.upsertCache('dashboard_summary', remote);
+      return remote;
+    } catch (e) {
+      if (cached.isNotEmpty) {
+        return cached;
+      }
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchCachedDashboardSummary() {
+    return LocalDbService.instance.getDashboardSummary();
+  }
+
+  static Future<Map<String, dynamic>> refreshDashboardSummaryCache() async {
+    final remote = await fetchDashboardSummaryRemote();
+    await LocalDbService.instance.upsertCache('dashboard_summary', remote);
+    return remote;
+  }
+
+  static Future<Map<String, dynamic>> fetchWalletBalanceRemote() async {
     final headers = await _authHeaders();
     final response = await http
         .get(Uri.parse('$baseUrl/api/v1/wallet/balance'), headers: headers)
@@ -585,6 +888,73 @@ class ApiService {
       throw _buildApiException(response);
     }
     return Map<String, dynamic>.from(_decodeBody(response.body) as Map);
+  }
+
+  static Future<Map<String, dynamic>> fetchWalletBalance() async {
+    final cached = await LocalDbService.instance.getWalletBalance();
+    try {
+      final remote = await fetchWalletBalanceRemote();
+      await LocalDbService.instance.upsertCache('wallet_balance', remote);
+      return remote;
+    } catch (e) {
+      if (cached.isNotEmpty) {
+        return cached;
+      }
+      rethrow;
+    }
+  }
+
+  static Future<Map<String, dynamic>> fetchCachedWalletBalance() {
+    return LocalDbService.instance.getWalletBalance();
+  }
+
+  static Future<Map<String, dynamic>> refreshWalletBalanceCache() async {
+    final remote = await fetchWalletBalanceRemote();
+    await LocalDbService.instance.upsertCache('wallet_balance', remote);
+    return remote;
+  }
+
+  static Future<DateTime?> getTransactionsLastSyncedAt() async {
+    final meta = await LocalDbService.instance.getCachedMap(
+      'transactions_meta',
+    );
+    final raw = meta['last_synced_at']?.toString();
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
+
+  static Future<bool> isTransactionsCacheStale() async {
+    final ts = await getTransactionsLastSyncedAt();
+    if (ts == null) return true;
+    return DateTime.now().toUtc().difference(ts.toUtc()) >
+        const Duration(hours: 12);
+  }
+
+  static Future<List<String>> fetchCachedCategories() async {
+    final cached = await LocalDbService.instance.getCachedCategories();
+    if (cached.isNotEmpty) return cached;
+    return const [
+      'General',
+      'Food',
+      'Transport',
+      'Entertainment',
+      'Shopping',
+      'Health',
+      'Savings',
+      'Income',
+    ];
+  }
+
+  static bool _isTransientNetworkError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('timeout') ||
+        message.contains('socket') ||
+        message.contains('network') ||
+        message.contains('connection');
+  }
+
+  static double _readDouble(Object? value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   // ─── PLACEHOLDER API HELPERS FOR EACH PAGE ─────────────────────────────────

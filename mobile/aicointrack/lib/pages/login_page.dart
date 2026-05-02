@@ -6,6 +6,7 @@ import '../config/theme.dart';
 import '../firebase_options.dart';
 import '../services/auth_service.dart';
 import '../services/base_auth_service.dart';
+import '../services/local_auth_lock_service.dart';
 import '../services/reown_auth_service.dart';
 import '../widgets/design_system.dart';
 import 'email_login_page.dart';
@@ -71,7 +72,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     try {
       if (DefaultFirebaseOptions.currentPlatform.apiKey == 'YOUR_API_KEY') {
         setState(() {
-          _errorMessage = 'Firebase is not configured yet. Update firebase options first.';
+          _errorMessage =
+              'Firebase is not configured yet. Update firebase options first.';
           _isGoogleLoading = false;
         });
         return;
@@ -83,10 +85,14 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
         return;
       }
 
+      await LocalAuthLockService.requestPinSetupPrompt();
+
       if (!mounted) return;
       setState(() => _isGoogleLoading = false);
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(
+          builder: (_) => const HomePage(promptForPinSetup: true),
+        ),
         (route) => false,
       );
     } on FirebaseAuthException catch (e) {
@@ -107,7 +113,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   Future<void> _handleReownSignIn() async {
     if (AppConstants.REOWN_PROJECT_ID == 'YOUR_REOWN_PROJECT_ID') {
       setState(() {
-        _errorMessage = 'Reown is not configured. Add a project id in constants.dart.';
+        _errorMessage =
+            'Reown is not configured. Add a project id in constants.dart.';
       });
       return;
     }
@@ -118,6 +125,19 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     });
     try {
       final success = await ReownAuthService.loginWithWallet(context);
+      if (success) {
+        await LocalAuthLockService.requestPinSetupPrompt();
+        if (!mounted) return;
+        setState(() => _isReownLoading = false);
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const HomePage(promptForPinSetup: true),
+          ),
+          (route) => false,
+        );
+        return;
+      }
+
       if (!success && mounted) {
         setState(() {
           _errorMessage = 'Wallet connection cancelled or failed.';
@@ -152,7 +172,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     }
   }
 
-  String _friendlyError(Object e) => e.toString().replaceFirst('Exception: ', '');
+  String _friendlyError(Object e) =>
+      e.toString().replaceFirst('Exception: ', '');
 
   @override
   Widget build(BuildContext context) {
@@ -186,9 +207,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                     const SizedBox(width: 10),
                     Text(
                       'AiCoinTrack',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: AppColors.accent,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: AppColors.accent),
                     ),
                   ],
                 ),
@@ -235,7 +255,10 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Welcome back', style: Theme.of(context).textTheme.headlineSmall),
+                      Text(
+                        'Welcome back',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         'Sign in to manage your portfolio and smart ledger.',
@@ -286,7 +309,8 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                         onPressed: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const EmailLoginPage(isSignUp: false),
+                              builder: (_) =>
+                                  const EmailLoginPage(isSignUp: false),
                             ),
                           );
                         },
@@ -374,7 +398,10 @@ class _PrimaryAuthButton extends StatelessWidget {
             ? const SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
               )
             : Row(
                 children: [
@@ -450,7 +477,10 @@ class _SecondaryAuthButton extends StatelessWidget {
                       children: [
                         Text(
                           label,
-                          style: TextStyle(color: fg, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: fg,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         if (subtitle != null) ...[
                           const SizedBox(height: 2),
@@ -478,22 +508,23 @@ class _InlineDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+        Expanded(
+          child: Divider(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Text(label, style: Theme.of(context).textTheme.bodySmall),
         ),
-        Expanded(child: Divider(color: Theme.of(context).colorScheme.outlineVariant)),
+        Expanded(
+          child: Divider(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
       ],
     );
   }
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({
-    required this.message,
-    required this.onDismiss,
-  });
+  const _ErrorBanner({required this.message, required this.onDismiss});
 
   final String message;
   final VoidCallback onDismiss;
@@ -510,20 +541,28 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: 18),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.danger,
+            size: 18,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppColors.danger,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.danger),
             ),
           ),
           const SizedBox(width: 8),
           GestureDetector(
             onTap: onDismiss,
-            child: const Icon(Icons.close_rounded, color: AppColors.danger, size: 18),
+            child: const Icon(
+              Icons.close_rounded,
+              color: AppColors.danger,
+              size: 18,
+            ),
           ),
         ],
       ),
