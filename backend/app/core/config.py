@@ -31,7 +31,11 @@ class Settings(BaseSettings):
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        return self.DATABASE_URL
+        # Use pg8000 (pure Python, no C extensions) instead of psycopg2
+        url = self.DATABASE_URL
+        if url.startswith('postgresql://'):
+            url = url.replace('postgresql://', 'postgresql+pg8000://', 1)
+        return url
 
     # Pydantic v2 config
     model_config = {
