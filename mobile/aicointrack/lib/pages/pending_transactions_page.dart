@@ -325,6 +325,7 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                                     fontWeight: FontWeight.w700,
                                     fontSize: 15,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -333,17 +334,21 @@ class _PendingTransactionsPageState extends State<PendingTransactionsPage> {
                                     color: mutedColor,
                                     fontSize: 12,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            '${isIncome ? '+' : '-'}${Formatters.formatKes(tx.amount)}',
-                            style: TextStyle(
-                              color: tone,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 15,
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${isIncome ? '+' : '-'}${Formatters.formatKes(tx.amount)}',
+                              style: TextStyle(
+                                color: tone,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],

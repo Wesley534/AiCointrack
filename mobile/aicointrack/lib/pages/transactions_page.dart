@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/notification_transaction_service.dart';
 import '../services/pending_transactions_service.dart';
 import '../services/sync_service.dart';
 import '../utils/formatters.dart';
@@ -26,6 +27,17 @@ class _TransactionsPageState extends State<TransactionsPage> {
   DateTime? _lastSyncedAt;
   bool _isCacheStale = true;
 
+  // Historical scan state
+  int _scanDuration = 30;
+  // Historical scan state
+  bool _isScanning = false;
+  bool _scanDone = false;
+  int _scanCount = 0;
+  bool _showScanCard = false;
+
+  // Approve all state
+  bool _isApprovingAll = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,13 +46,19 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
   Future<void> _loadData() async {
     final source = _apiSourceForFilter(_activeFilter);
-    final cached = await ApiService.fetchCachedTransactions(
-      limit: 50,
-      source: source,
-    );
-    final pending = await PendingTxService.getAll();
-    final lastSyncedAt = await ApiService.getTransactionsLastSyncedAt();
-    final isCacheStale = await ApiService.isTransactionsCacheStale();
+
+    // Parallelize cache reads for better performance
+    final results = await Future.wait([
+      ApiService.fetchCachedTransactions(limit: 50, source: source),
+      PendingTxService.getAll(),
+      ApiService.getTransactionsLastSyncedAt(),
+      ApiService.isTransactionsCacheStale(),
+    ]);
+
+    final cached = results[0] as List<Map<String, dynamic>>;
+    final pending = results[1] as List<PendingTx>;
+    final lastSyncedAt = results[2] as DateTime?;
+    final isCacheStale = results[3] as bool;
 
     if (!mounted) return;
     setState(() {
@@ -52,6 +70,7 @@ class _TransactionsPageState extends State<TransactionsPage> {
       _isRefreshing = cached.isNotEmpty;
       _error = null;
     });
+    pendingCountNotifier.value = pending.length;
 
     try {
       final result = await ApiService.refreshTransactionsCache(
@@ -62,13 +81,11 @@ class _TransactionsPageState extends State<TransactionsPage> {
       if (!mounted) return;
       setState(() {
         _data = _applyClientFilter(result);
-        _pendingTxs = pending;
         _lastSyncedAt = DateTime.now().toUtc();
         _isCacheStale = false;
         _isLoading = false;
         _isRefreshing = false;
       });
-      pendingCountNotifier.value = pending.length;
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -101,6 +118,119 @@ class _TransactionsPageState extends State<TransactionsPage> {
       return source != 'onchain' && source != 'cash';
     }).toList();
   }
+
+  // ── Historical SMS Scan ─────────────────────────────────────────────────
+
+  Future<void> _scanHistoricalMessages() async {
+    // Check SMS permission first
+    final hasSms = await NotificationTransactionService.hasSmsPermission();
+    if (!hasSms && mounted) {
+      final grant = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('SMS Permission'),
+          content: const Text(
+            'CoinTrack needs SMS permission to read past M-Pesa and bank messages. '
+            'Would you like to grant it now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Grant'),
+            ),
+          ],
+        ),
+      );
+
+      if (grant == true && mounted) {
+        await NotificationTransactionService.requestSmsPermission();
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (!mounted) return;
+      final stillHas = await NotificationTransactionService.hasSmsPermission();
+      if (!stillHas && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('SMS permission is required to scan past messages.'),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+        return;
+      }
+    }
+
+    setState(() {
+      _isScanning = true;
+      _scanDone = false;
+      _scanCount = 0;
+    });
+
+    try {
+      final transactions = await NotificationTransactionService
+          .scanHistoricalMessages(durationDays: _scanDuration);
+
+      if (!mounted) return;
+
+      for (final tx in transactions) {
+        await PendingTxService.add(
+          PendingTx(
+            id: '${tx.hash}_${DateTime.now().millisecondsSinceEpoch}',
+            amount: tx.amount,
+            type: tx.type,
+            description: tx.description,
+            source: tx.source,
+            category: tx.type == 'income' ? 'Income' : 'General',
+            detectedAt: DateTime.now(),
+            rawText: tx.rawText,
+            transactionCode: tx.transactionCode,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+      pendingCountNotifier.value = await PendingTxService.count();
+
+      setState(() {
+        _isScanning = false;
+        _scanDone = true;
+        _scanCount = transactions.length;
+      });
+
+      // Refresh the pending transactions display
+      await _loadData();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Found ${transactions.length} historical transaction${transactions.length == 1 ? '' : 's'} — review them in Pending',
+          ),
+          backgroundColor: AppColors.accent,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isScanning = false;
+        _scanDone = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Scan failed: ${e.toString().replaceFirst("Exception: ", "")}',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  // ── End actions ─────────────────────────────────────────────────────────
 
   Future<void> _openAddSheet() async {
     await showModalBottomSheet<void>(
@@ -162,14 +292,69 @@ class _TransactionsPageState extends State<TransactionsPage> {
         _pendingTxs.removeWhere((item) => item.id == tx.id);
       });
       pendingCountNotifier.value = _pendingTxs.length;
-      _showMessage('Transaction logged');
-      await _loadData();
     } catch (e) {
       _showMessage(e.toString().replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) {
         setState(() => _busyIds.remove(tx.id));
       }
+    }
+  }
+
+  Future<void> _approveAllPending() async {
+    if (_pendingTxs.isEmpty || _isApprovingAll) return;
+
+    setState(() => _isApprovingAll = true);
+    final toApprove = List<PendingTx>.from(_pendingTxs);
+    int approved = 0;
+    int failed = 0;
+
+    // Process in batches of 5 for parallel efficiency without overwhelming
+    for (int i = 0; i < toApprove.length; i += 5) {
+      if (!mounted) break;
+      final batch = toApprove.sublist(
+        i, (i + 5).clamp(0, toApprove.length),
+      );
+
+      final batchResults = await Future.wait(
+        batch.map((tx) => _approveSinglePending(tx)),
+      );
+
+      for (final success in batchResults) {
+        if (success) approved++;
+        else failed++;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _isApprovingAll = false);
+
+    // Reload data once at the end
+    await _loadData();
+
+    if (!mounted) return;
+    _showMessage('Approved $approved transactions${failed > 0 ? ', $failed failed' : ''}');
+  }
+
+  /// Approve a single pending transaction. Returns true on success.
+  Future<bool> _approveSinglePending(PendingTx tx) async {
+    try {
+      await ApiService.recordOffchainTransaction(
+        description: tx.description,
+        amount: tx.amount,
+        source: _sourceForApi(tx.source),
+        transactionType: tx.type,
+        category: tx.category,
+      );
+      await PendingTxService.remove(tx.id);
+      if (mounted) {
+        setState(() {
+          _pendingTxs.removeWhere((item) => item.id == tx.id);
+        });
+      }
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -196,71 +381,234 @@ class _TransactionsPageState extends State<TransactionsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return AppPage(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Transaction Feed',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Review detected payments, track manual entries, and keep the ledger clean.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
+              Text(
+                'Transaction Feed',
+                style: theme.textTheme.headlineMedium,
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: _manualSync,
-                icon: const Icon(Icons.sync_rounded),
-                label: const Text('Sync'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: _openAddSheet,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add'),
+              const SizedBox(height: 6),
+              Text(
+                'Review detected payments, track manual entries, and keep the ledger clean.',
+                style: theme.textTheme.bodyMedium,
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _FilterPill(
-                  label: 'All',
-                  selected: _activeFilter == 'all',
-                  onTap: () => _setFilter('all'),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _FilterPill(
+                        label: 'All',
+                        selected: _activeFilter == 'all',
+                        onTap: () => _setFilter('all'),
+                      ),
+                      _FilterPill(
+                        label: 'Auto-logged',
+                        selected: _activeFilter == 'auto',
+                        onTap: () => _setFilter('auto'),
+                      ),
+                      _FilterPill(
+                        label: 'Onchain',
+                        selected: _activeFilter == 'onchain',
+                        onTap: () => _setFilter('onchain'),
+                      ),
+                      _FilterPill(
+                        label: 'Manual',
+                        selected: _activeFilter == 'manual',
+                        onTap: () => _setFilter('manual'),
+                      ),
+                    ],
+                  ),
                 ),
-                _FilterPill(
-                  label: 'Auto-logged',
-                  selected: _activeFilter == 'auto',
-                  onTap: () => _setFilter('auto'),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 36,
+                child: OutlinedButton.icon(
+                  onPressed: _manualSync,
+                  icon: const Icon(Icons.sync_rounded, size: 16),
+                  label: const Text('Sync'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
                 ),
-                _FilterPill(
-                  label: 'Onchain',
-                  selected: _activeFilter == 'onchain',
-                  onTap: () => _setFilter('onchain'),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 36,
+                child: ElevatedButton.icon(
+                  onPressed: _openAddSheet,
+                  icon: const Icon(Icons.add_rounded, size: 16),
+                  label: const Text('Add'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                  ),
                 ),
-                _FilterPill(
-                  label: 'Manual',
-                  selected: _activeFilter == 'manual',
-                  onTap: () => _setFilter('manual'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Historical Scan Card ──────────────────────────────────────
+          GestureDetector(
+            onTap: () => setState(() => _showScanCard = !_showScanCard),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.15),
                 ),
-              ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 18,
+                    color: AppColors.accent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Scan past M-Pesa & bank messages',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _showScanCard
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 18,
+                    color: AppColors.accent,
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 18),
+
+          if (_showScanCard) ...[
+            const SizedBox(height: 10),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: theme.dividerColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Read past SMS from M-Pesa, KCB, Equity & NCBA',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DurationDropdown(
+                          value: _scanDuration,
+                          onChanged: (v) {
+                            if (v != null) setState(() => _scanDuration = v);
+                          },
+                          cardColor: theme.colorScheme.surface,
+                          textColor: theme.colorScheme.onSurface,
+                          borderColor: theme.dividerColor,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 90,
+                        height: 40,
+                        child: ElevatedButton.icon(
+                          onPressed: _isScanning ? null : _scanHistoricalMessages,
+                          icon: _isScanning
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.search_rounded, size: 16),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(_isScanning ? 'Scanning...' : 'Scan'),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor:
+                                AppColors.accent.withValues(alpha: 0.4),
+                            minimumSize: const Size(78, 36),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_scanDone) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Icon(
+                          _scanCount > 0
+                              ? Icons.check_circle_outline
+                              : Icons.info_outline,
+                          size: 14,
+                          color: _scanCount > 0
+                              ? AppColors.accent
+                              : AppColors.warning,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _scanCount > 0
+                                ? 'Found $_scanCount transaction${_scanCount == 1 ? '' : 's'}. Review them in Pending above.'
+                                : 'No financial transactions found in the selected period.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: _scanCount > 0
+                                  ? AppColors.accent
+                                  : AppColors.warning,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // ── Status pills ─────────────────────────────────────────────
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -281,6 +629,8 @@ class _TransactionsPageState extends State<TransactionsPage> {
             ],
           ),
           const SizedBox(height: 18),
+
+          // ── Content ──────────────────────────────────────────────────
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.only(top: 60),
@@ -308,12 +658,40 @@ class _TransactionsPageState extends State<TransactionsPage> {
           else ...[
             if (_pendingTxs.isNotEmpty) ...[
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Pending Review',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  Expanded(
+                    child: Text(
+                      'Pending Review',
+                      style: theme.textTheme.titleLarge,
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  if (_pendingTxs.length > 1) ...[
+                    SizedBox(
+                      height: 30,
+                      child: OutlinedButton(
+                        onPressed: _isApprovingAll
+                            ? null
+                            : _approveAllPending,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
+                          side: BorderSide(color: AppColors.accent.withValues(alpha: 0.5)),
+                        ),
+                        child: _isApprovingAll
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Text(
+                                'Approve All',
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   AppPill(
                     label: '${_pendingTxs.length} new',
                     color: AppColors.danger,
@@ -321,16 +699,42 @@ class _TransactionsPageState extends State<TransactionsPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              ..._pendingTxs.map(_buildPendingCard),
+              ..._pendingTxs.take(5).map(_buildPendingCard),
+              if (_pendingTxs.length > 5) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 4, bottom: 8),
+                  child: Center(
+                    child: TextButton(
+                      onPressed: () {
+                        // Scroll to expand is implicit — we just show a count
+                        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                          SnackBar(
+                            content: Text('${_pendingTxs.length - 5} more pending transactions'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        '+${_pendingTxs.length - 5} more pending',
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 18),
             ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Activity', style: Theme.of(context).textTheme.titleLarge),
+                Text('Activity', style: theme.textTheme.titleLarge),
                 Text(
                   '${_data.length} items',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),
@@ -458,25 +862,26 @@ class _TransactionsPageState extends State<TransactionsPage> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Text(
                           Formatters.formatDate(item['created_at']?.toString()),
                           style: Theme.of(context).textTheme.bodySmall,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      AppPill(
-                        label: _sourceLabel(source),
-                        color: _sourceTone(source),
-                      ),
-                      const SizedBox(width: 8),
-                      _SyncStatusPill(
-                        status: (item['sync_status'] ?? 'synced').toString(),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        AppPill(
+                          label: _sourceLabel(source),
+                          color: _sourceTone(source),
+                        ),
+                        const SizedBox(width: 6),
+                        _SyncStatusPill(
+                          status:
+                              (item['sync_status'] ?? 'synced').toString(),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -607,6 +1012,58 @@ class _FilterPill extends StatelessWidget {
           label: label,
           color: selected ? AppColors.accent : AppColors.purple,
           filled: selected,
+        ),
+      ),
+    );
+  }
+}
+
+/// Duration picker dropdown reused for historical scan duration.
+class _DurationDropdown extends StatelessWidget {
+  final int value;
+  final ValueChanged<int?> onChanged;
+  final Color cardColor;
+  final Color textColor;
+  final Color borderColor;
+
+  const _DurationDropdown({
+    required this.value,
+    required this.onChanged,
+    required this.cardColor,
+    required this.textColor,
+    required this.borderColor,
+  });
+
+  static const _options = <int, String>{
+    1: 'Last 1 day',
+    7: 'Last 7 days',
+    14: 'Last 2 weeks',
+    30: 'Last 1 month',
+    90: 'Last 3 months',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor),
+        color: Colors.transparent,
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: value,
+          dropdownColor: cardColor,
+          style: TextStyle(color: textColor, fontSize: 13),
+          isExpanded: true,
+          items: _options.entries
+              .map((e) => DropdownMenuItem<int>(
+                    value: e.key,
+                    child: Text(e.value),
+                  ))
+              .toList(),
+          onChanged: onChanged,
         ),
       ),
     );

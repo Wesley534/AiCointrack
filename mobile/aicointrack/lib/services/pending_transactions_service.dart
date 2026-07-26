@@ -18,6 +18,7 @@ class PendingTx {
   final String category;
   final DateTime detectedAt;
   final String rawText;
+  final String transactionCode;
 
   const PendingTx({
     required this.id,
@@ -28,6 +29,7 @@ class PendingTx {
     required this.category,
     required this.detectedAt,
     required this.rawText,
+    this.transactionCode = '',
   });
 
   PendingTx copyWith({
@@ -55,6 +57,7 @@ class PendingTx {
     'category': category,
     'detectedAt': detectedAt.toIso8601String(),
     'rawText': rawText,
+    'transactionCode': transactionCode,
   };
 
   factory PendingTx.fromJson(Map<String, dynamic> j) => PendingTx(
@@ -66,6 +69,7 @@ class PendingTx {
     category: j['category'] as String,
     detectedAt: DateTime.parse(j['detectedAt'] as String),
     rawText: j['rawText'] as String,
+    transactionCode: (j['transactionCode'] as String?) ?? '',
   );
 }
 
