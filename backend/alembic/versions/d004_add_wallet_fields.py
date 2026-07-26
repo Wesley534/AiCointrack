@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add wallet and auth_providers fields."""
     op.add_column('users', sa.Column('wallet_address', sa.String(length=42), nullable=True))
-    op.add_column('users', sa.Column('wallet_created_by_system', sa.Boolean(), nullable=True, server_default='0'))
+    op.add_column('users', sa.Column('wallet_created_by_system', sa.Boolean(), nullable=True, server_default=sa.text('false')))
     op.add_column('users', sa.Column('auth_providers', sa.JSON(), nullable=True))
     op.create_index('ix_users_wallet_address', 'users', ['wallet_address'], unique=True)
     # Make email nullable for wallet-only users (e.g. wallet@cointrack.xyz placeholder)

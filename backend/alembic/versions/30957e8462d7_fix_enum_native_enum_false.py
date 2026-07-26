@@ -18,15 +18,13 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema - convert ENUM to VARCHAR to avoid case sensitivity issues."""
-    # Convert ENUM columns to VARCHAR to preserve data and avoid case issues
-    # Data will remain lowercase (mpesa, bank, cash, onchain, expense, income)
-    op.execute('ALTER TABLE transactions MODIFY COLUMN source VARCHAR(20) NOT NULL')
-    op.execute('ALTER TABLE transactions MODIFY COLUMN transaction_type VARCHAR(20) DEFAULT "expense"')
+    """Upgrade schema - convert ENUM to VARCHAR (PostgreSQL-compatible)."""
+    # The initial migration already creates source as String and transaction_type
+    # was set as String by f006_enhance_tx, so this migration is a no-op for PostgreSQL.
+    # On MySQL the raw ALTER TABLE statements were needed to strip ENUM types.
+    pass
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
-    # Revert to ENUM columns with lowercase values
-    op.execute('ALTER TABLE transactions MODIFY COLUMN source ENUM("mpesa", "bank", "cash", "onchain") NOT NULL')
-    op.execute('ALTER TABLE transactions MODIFY COLUMN transaction_type ENUM("expense", "income") DEFAULT "expense"')
+    """Downgrade schema - no-op (ENUM was never used on PostgreSQL)."""
+    pass

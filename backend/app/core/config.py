@@ -9,13 +9,10 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    MYSQL_USER: str
-    MYSQL_PASSWORD: str
-    MYSQL_SERVER: str
-    MYSQL_PORT: str
-    MYSQL_DB: str
-
+    # Database — set DATABASE_URL to your Neon PostgreSQL connection string.
+    # Format: postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
     DATABASE_URL: str
+
     BASE_RPC_URL: str
     CHAIN_ID: int = 84532
     FRONTEND_URL: str = "https://app.aicointrack.xyz"
@@ -34,11 +31,7 @@ class Settings(BaseSettings):
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        # Prefer explicit DATABASE_URL if provided; otherwise build from parts.
-        return self.DATABASE_URL or (
-            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
-            f"@{self.MYSQL_SERVER}:{self.MYSQL_PORT}/{self.MYSQL_DB}"
-        )
+        return self.DATABASE_URL
 
     # Pydantic v2 config
     model_config = {

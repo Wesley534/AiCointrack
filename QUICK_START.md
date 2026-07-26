@@ -181,7 +181,7 @@ Before testing:
    - Checks signature and expiration
 
 5. **Backend creates/updates user**
-   - Saves to MySQL database
+   - Saves to Neon PostgreSQL database
    - Returns user info
 
 6. **App shows HomePage**
