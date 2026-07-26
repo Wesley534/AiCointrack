@@ -35,6 +35,18 @@ class Settings(BaseSettings):
         url = self.DATABASE_URL
         if url.startswith('postgresql://'):
             url = url.replace('postgresql://', 'postgresql+pg8000://', 1)
+        # pg8000 doesn't support sslmode or channel_binding query params;
+        # it uses SSL by default for remote connections, so we strip them.
+        from urllib.parse import urlparse, urlencode, parse_qs
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        for key in ('sslmode', 'channel_binding'):
+            query.pop(key, None)
+        if query:
+            new_query = urlencode(query, doseq=True)
+            url = url.replace(f'?{parsed.query}', f'?{new_query}')
+        else:
+            url = url.split('?')[0] if '?' in url else url
         return url
 
     # Pydantic v2 config
