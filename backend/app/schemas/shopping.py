@@ -9,6 +9,11 @@ class ShoppingItemBase(BaseModel):
 class ShoppingItemCreate(ShoppingItemBase):
     pass
 
+class ShoppingItemUpdate(BaseModel):
+    name: Optional[str] = None
+    qty: Optional[int] = None
+    price: Optional[float] = None
+
 class ShoppingItemResponse(ShoppingItemBase):
     id: int
     list_id: int

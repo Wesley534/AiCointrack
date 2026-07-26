@@ -181,8 +181,94 @@ class AppMetricTile extends StatelessWidget {
                 color: tint,
                 fontWeight: FontWeight.w700,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A row-based skeleton placeholder used during data loading.
+/// Mimics the shape of a typical card with icon + text + amount.
+class AppSkeletonCard extends StatelessWidget {
+  const AppSkeletonCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? Colors.white12 : Colors.black12;
+
+    return AppGlassCard(
+      radius: 24,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: base,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: base,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: 140,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: base,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 80,
+            height: 16,
+            decoration: BoxDecoration(
+              color: base,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A vertical stack skeleton that lists [count] skeleton cards with spacing.
+class AppSkeletonList extends StatelessWidget {
+  const AppSkeletonList({super.key, this.count = 5});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppPage(
+      child: Column(
+        children: List.generate(
+          count,
+          (i) => Padding(
+            padding: EdgeInsets.only(bottom: i < count - 1 ? 12 : 0),
+            child: const AppSkeletonCard(),
+          ),
         ),
       ),
     );

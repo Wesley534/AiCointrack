@@ -732,6 +732,40 @@ class ApiService {
     return decoded;
   }
 
+  static Future<Map<String, dynamic>> updateShoppingItem(
+    int listId,
+    int itemId, {
+    required String name,
+    required int qty,
+    required double price,
+  }) async {
+    final headers = await _authHeaders();
+    final response = await http
+        .put(
+          Uri.parse('$baseUrl/api/v1/shopping-lists/$listId/items/$itemId'),
+          headers: headers,
+          body: jsonEncode({'name': name, 'qty': qty, 'price': price}),
+        )
+        .timeout(
+          _requestTimeout,
+          onTimeout: () => throw Exception('Request timeout'),
+        );
+
+    if (response.statusCode != 200) {
+      throw _buildApiException(response);
+    }
+    final decoded = Map<String, dynamic>.from(
+      _decodeBody(response.body) as Map,
+    );
+    await refreshShoppingListDetailCache(
+      listId,
+    ).catchError((_) => <String, dynamic>{});
+    await refreshShoppingListsCache().catchError(
+      (_) => <Map<String, dynamic>>[],
+    );
+    return decoded;
+  }
+
   static Future<List<Map<String, dynamic>>> fetchSavingsGoalsFromApi() async {
     final headers = await _authHeaders();
     final response = await http

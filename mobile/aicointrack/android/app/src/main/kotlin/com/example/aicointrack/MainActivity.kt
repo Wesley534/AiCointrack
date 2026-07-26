@@ -88,6 +88,59 @@ class MainActivity : FlutterFragmentActivity() {
                         result.error("error", "Failed to read pending transactions", null)
                     }
                 }
+                "hasSmsPermission" -> {
+                    try {
+                        val granted = checkSelfPermission(android.Manifest.permission.READ_SMS) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        Log.d("MainActivity", "SMS permission granted: $granted")
+                        result.success(granted)
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to check SMS permission", e)
+                        result.success(false)
+                    }
+                }
+                "requestSmsPermission" -> {
+                    try {
+                        requestPermissions(
+                            arrayOf(android.Manifest.permission.READ_SMS),
+                            1001, // REQUEST_SMS_PERMISSION
+                        )
+                        result.success(null)
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to request SMS permission", e)
+                        result.error("error", "Failed to request SMS permission", null)
+                    }
+                }
+                "scanHistoricalMessages" -> {
+                    try {
+                        val args = call.arguments as? Map<String, Any>
+                        val durationDays = (args?.get("durationDays") as? Number)?.toInt() ?: 7
+                        Log.d("MainActivity", "scanHistoricalMessages durationDays=$durationDays")
+
+                        // Use the companion object's static method — no service instance needed
+                        val transactions = NotificationService.Companion.scanHistoricalMessages(
+                            contentResolver,
+                            durationDays,
+                        )
+
+                        // Convert JSONArray to List<Map<String, String>> for Flutter
+                        val out = ArrayList<Map<String, String>>()
+                        for (i in 0 until transactions.length()) {
+                            val obj = transactions.getJSONObject(i)
+                            val map = HashMap<String, String>()
+                            for (key in obj.keys()) {
+                                map[key] = obj.optString(key, "")
+                            }
+                            out.add(map)
+                        }
+
+                        Log.d("MainActivity", "scanHistoricalMessages found ${out.size} transactions")
+                        result.success(out)
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainActivity", "scanHistoricalMessages failed", e)
+                        result.error("error", "Failed to scan historical messages: ${e.message}", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
