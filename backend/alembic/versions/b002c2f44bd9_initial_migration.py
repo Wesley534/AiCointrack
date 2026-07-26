@@ -39,7 +39,7 @@ def upgrade() -> None:
     sa.Column('currency', sa.String(length=10), nullable=True),
     sa.Column('description', sa.String(length=255), nullable=True),
     sa.Column('category', sa.String(length=100), nullable=True),
-    sa.Column('source', sa.Enum('MPESA', 'BANK', 'ONCHAIN', name='sourcetype'), nullable=True),
+    sa.Column('source', sa.String(length=20), nullable=False),
     sa.Column('tx_hash', sa.String(length=255), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),

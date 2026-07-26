@@ -1,0 +1,46 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.eggs/
+dist/
+build/
+.mypy_cache/
+.pytest_cache/
+.coverage
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+ENV/
+
+# ── Environment & secrets (these should be passed as Docker --env / Render env vars) ──
+.env
+.env.*
+*serviceAccountKey*
+*aicointrack*service*account*
+
+# ── Version control ───────────────────────────────────────────────────────────
+.git/
+.gitignore
+
+# ── Documentation ─────────────────────────────────────────────────────────────
+README.md
+*.md
+
+# ── IDE / OS ──────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Tests (moved into image? No — keeps layers smaller) ──────────────────────
+test_*.py

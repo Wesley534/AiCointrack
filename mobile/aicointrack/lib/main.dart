@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -20,43 +21,62 @@ import 'pages/pin_unlock_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Environment Configuration ────────────────────────────────────────────────
-  try {
-    await dotenv.load(fileName: '.env');
-    debugPrint('✓ Environment variables loaded from .env');
-  } catch (e) {
-    debugPrint('✗ Environment loading failed (non-fatal): $e');
-  }
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('[FlutterError] ${details.exceptionAsString()}');
+    debugPrint(details.stack.toString());
+  };
 
-  // ── Firebase ─────────────────────────────────────────────────────────────────
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    debugPrint('[PlatformDispatcher] $error');
+    debugPrint(stack.toString());
+    return true;
+  };
+
+  await runZonedGuarded(
+    () async {
+      // ── Environment Configuration ─────────────────────────────────────────────
+      try {
+        await dotenv.load(fileName: '.env');
+        debugPrint('✓ Environment variables loaded from .env');
+      } catch (e) {
+        debugPrint('✗ Environment loading failed (non-fatal): $e');
+      }
+
+      // ── Firebase ──────────────────────────────────────────────────────────────
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        }
+        debugPrint('✓ Firebase initialized');
+      } catch (e) {
+        debugPrint('✗ Firebase initialization failed: $e');
+      }
+
+      // NOTE: ReownAuthService.init() requires a BuildContext, so it is called
+      // lazily the first time LoginPage builds — see LoginPage._initReown().
+      // BaseAuthService has no async init — it is fully stateless.
+
+      await LocalAuthLockService.initialize();
+
+      runApp(
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
+          child: const MyApp(),
+        ),
       );
-    }
-    debugPrint('✓ Firebase initialized');
-  } catch (e) {
-    debugPrint('✗ Firebase initialization failed: $e');
-  }
 
-  // NOTE: ReownAuthService.init() requires a BuildContext, so it is called
-  // lazily the first time LoginPage builds — see LoginPage._initReown().
-  // BaseAuthService has no async init — it is fully stateless.
-
-  await LocalAuthLockService.initialize();
-
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
-      child: const MyApp(),
-    ),
+      unawaited(_warmStartupServices());
+    },
+    (Object error, StackTrace stack) {
+      debugPrint('[runZonedGuarded] $error');
+      debugPrint(stack.toString());
+    },
   );
-
-  unawaited(_warmStartupServices());
 }
 
 Future<void> _warmStartupServices() async {

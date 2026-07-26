@@ -1,0 +1,71 @@
+# =============================================================================
+# CoinTrack Backend — Render Blueprints (render.yaml)
+#
+# Deploy with:
+#   1. Create a Neon PostgreSQL database at https://console.neon.tech
+#   2. Copy the connection string (looks like postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require)
+#   3. Set it as DATABASE_URL in Render's env vars (sync:false below)
+#   4. Push this repo to GitHub and connect it to Render
+#   5. Render will auto-detect render.yaml and create the service
+#   6. Fill in the remaining sync:false env vars from the Render dashboard
+# =============================================================================
+
+services:
+  - type: web
+    name: aicointrack-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    plan: starter
+    region: oregon
+
+    healthCheckPath: /
+    healthCheckTimeout: 30
+
+    envVars:
+      # ─── Required — set these ────────────────────────────────────────────────
+      - key: PROJECT_NAME
+        value: "CoinTrack API"
+
+      - key: VERSION
+        value: "1.0.0"
+
+      - key: API_V1_STR
+        value: "/api/v1"
+
+      - key: SECRET_KEY
+        generateValue: true
+
+      - key: ALGORITHM
+        value: "HS256"
+
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+
+      - key: BASE_RPC_URL
+        value: "https://sepolia.base.org"
+
+      - key: CHAIN_ID
+        value: "84532"
+
+      - key: FRONTEND_URL
+        value: "https://app.aicointrack.xyz"
+
+      # ─── You MUST set these from the Render dashboard after first deploy ──────
+      # They are marked sync:false so Render does not block the initial deploy.
+
+      - key: DATABASE_URL
+        sync: false
+        # Paste your Neon connection string here:
+        # postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+
+      - key: HF_API_KEY
+        sync: false
+
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+
+      - key: PRIVY_APP_ID
+        sync: false
+
+      - key: PRIVY_APP_SECRET
+        sync: false

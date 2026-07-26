@@ -50,10 +50,8 @@ The following sensitive files are in `.gitignore` and must NEVER be committed:
 
 2. **Update `backend/.env` with your values:**
    ```bash
-   # Database
-   MYSQL_USER=your_db_user
-   MYSQL_PASSWORD=your_db_password
-   MYSQL_SERVER=your_db_host
+   # Database (Neon PostgreSQL)
+   DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
    
    # Security
    SECRET_KEY=generate_a_strong_key  # python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -153,10 +151,7 @@ flutter run
 |----------|----------|-------------|
 | `PROJECT_NAME` | Yes | API project name |
 | `SECRET_KEY` | Yes | JWT signing secret (keep secure!) |
-| `MYSQL_USER` | Yes | Database username |
-| `MYSQL_PASSWORD` | Yes | Database password |
-| `MYSQL_SERVER` | Yes | Database hostname |
-| `MYSQL_DB` | Yes | Database name |
+| `DATABASE_URL` | Yes | Neon PostgreSQL connection string |
 | `FIREBASE_PROJECT_ID` | Yes | Firebase project ID |
 | `FIREBASE_CREDENTIALS_PATH` | No | Path to service account key |
 | `FIREBASE_API_KEY` | No | Firebase API key |
@@ -184,9 +179,9 @@ flutter run
 - Check if backend is running and accessible
 
 ### Database Connection Error
-- Verify MySQL is running
-- Check `MYSQL_*` variables in `.env`
-- Ensure database user has correct permissions
+- Verify your Neon PostgreSQL database is running (check https://console.neon.tech)
+- Check `DATABASE_URL` in `.env`
+- Ensure connection string has correct credentials and `sslmode=require`
 
 ## 📝 Best Practices
 
@@ -210,7 +205,7 @@ Before deploying to production:
 
 1. ✅ Update all `.env` variables with production values
 2. ✅ Generate new `SECRET_KEY`
-3. ✅ Set up production database with strong credentials
+3. ✅ Set up Neon PostgreSQL database (https://console.neon.tech)
 4. ✅ Configure production Firebase project
 5. ✅ Update backend URL in mobile app
 6. ✅ Enable HTTPS everywhere

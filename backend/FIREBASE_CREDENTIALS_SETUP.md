@@ -92,13 +92,8 @@ SECRET_KEY="your-super-secret-key-change-in-production"
 ALGORITHM="HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=11520
 
-# MySQL Database
-MYSQL_USER=root
-MYSQL_PASSWORD=7459
-MYSQL_SERVER=localhost
-MYSQL_PORT=3306
-MYSQL_DB=cointrack_db
-DATABASE_URL="mysql+pymysql://root:7459@localhost:3306/cointrack_db"
+# Database (Neon PostgreSQL)
+DATABASE_URL="postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require"
 
 # Firebase Configuration
 FIREBASE_PROJECT_ID=ecotrack-efd6e
