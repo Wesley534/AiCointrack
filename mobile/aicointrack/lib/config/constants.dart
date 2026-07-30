@@ -8,8 +8,7 @@ class AppConstants {
   // - Local dev: http://localhost:8000
   // - Remote dev: https://your-devtunnel-url.uks1.devtunnels.ms
   // - Production: https://your-production-api.com
-  static const String BACKEND_URL =
-      'https://casual-traveller-talented-engaged.trycloudflare.com';
+  static const String BACKEND_URL = 'https://aicointrack.onrender.com';
 
   // Firebase Configuration
   // These are configured in firebase_options.dart

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/local_auth_lock_service.dart';
 import '../firebase_options.dart';
 import '../config/theme.dart';
 import 'home_page.dart';
@@ -73,10 +74,14 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
         debugPrint('$_logTag signInWithEmail success');
       }
 
+      await LocalAuthLockService.requestPinSetupPrompt();
+
       if (mounted) {
         debugPrint('$_logTag navigating to HomePage via pushAndRemoveUntil');
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(
+            builder: (context) => const HomePage(promptForPinSetup: true),
+          ),
           (route) => false,
         );
       }
@@ -165,7 +170,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.danger.withOpacity(0.1),
+                      color: AppColors.danger.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -189,7 +194,7 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     textCapitalization: TextCapitalization.words,
                   ),
 
-                if (_isSignUp) const SizedBox(height: 16),
+                if (_isSignUp) ...[const SizedBox(height: 16)],
 
                 TextFormField(
                   controller: _emailController,
@@ -202,8 +207,9 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     filled: true,
                   ),
                   validator: (v) {
-                    if (v == null || v.trim().isEmpty)
+                    if (v == null || v.trim().isEmpty) {
                       return 'Enter your email';
+                    }
                     if (!v.contains('@')) return 'Enter a valid email';
                     return null;
                   },

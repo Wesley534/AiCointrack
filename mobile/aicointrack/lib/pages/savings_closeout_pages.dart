@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../services/api_service.dart';
+import '../services/local_db_service.dart';
 import '../utils/formatters.dart';
+import '../widgets/design_system.dart';
 
 /// Savings goals page.
 class SavingsPage extends StatefulWidget {
@@ -13,6 +15,8 @@ class SavingsPage extends StatefulWidget {
 
 class _SavingsPageState extends State<SavingsPage> {
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  bool _isStale = true;
   String? _error;
   List<dynamic> _data = [];
 
@@ -23,25 +27,40 @@ class _SavingsPageState extends State<SavingsPage> {
   }
 
   Future<void> _loadData() async {
+    final results = await Future.wait([
+      ApiService.fetchCachedSavingsGoals(),
+      LocalDbService.instance.isCacheStale('savings_goals'),
+    ]);
+    final cached = results[0] as List<dynamic>;
+    final isStale = results[1] as bool;
+
     if (mounted) {
       setState(() {
-        _isLoading = true;
+        _data = cached;
+        _isLoading = cached.isEmpty;
+        _isRefreshing = cached.isNotEmpty;
+        _isStale = isStale;
         _error = null;
       });
     }
     try {
-      final result = await ApiService.fetchSavingsGoalsFromApi();
+      final result = await ApiService.refreshSavingsGoalsCache();
       if (mounted) {
         setState(() {
           _data = result;
           _isLoading = false;
+          _isRefreshing = false;
+          _isStale = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString().replaceFirst('Exception: ', '');
+          if (_data.isEmpty) {
+            _error = e.toString().replaceFirst('Exception: ', '');
+          }
           _isLoading = false;
+          _isRefreshing = false;
         });
       }
     }
@@ -75,32 +94,20 @@ class _SavingsPageState extends State<SavingsPage> {
     }
   }
 
-  Widget _buildLoader(Color mutedColor) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation(AppColors.accent),
-          ),
-          const SizedBox(height: 12),
-          Text('Loading...', style: TextStyle(color: mutedColor, fontSize: 14)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError(Color mutedColor) {
+  Widget _buildError() {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
           const SizedBox(height: 12),
-          Text(
-            _error!,
-            style: TextStyle(color: mutedColor, fontSize: 14),
-            textAlign: TextAlign.center,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              _error!,
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
           ),
           const SizedBox(height: 16),
           ElevatedButton(onPressed: _loadData, child: const Text('Retry')),
@@ -109,7 +116,7 @@ class _SavingsPageState extends State<SavingsPage> {
     );
   }
 
-  Widget _buildEmpty(Color mutedColor) {
+  Widget _buildEmpty() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(top: 48),
@@ -120,7 +127,7 @@ class _SavingsPageState extends State<SavingsPage> {
             const SizedBox(height: 12),
             Text(
               'No savings goals yet',
-              style: TextStyle(color: mutedColor, fontSize: 14),
+              style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -135,13 +142,7 @@ class _SavingsPageState extends State<SavingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
-    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-
+    final theme = Theme.of(context);
     final goals = _data.cast<Map<String, dynamic>>();
 
     final totalSaved = goals.fold<double>(
@@ -149,192 +150,195 @@ class _SavingsPageState extends State<SavingsPage> {
       (sum, g) => sum + (((g['saved'] ?? 0) as num).toDouble()),
     );
 
-    return Container(
-      color: bgColor,
-      child: _isLoading
-          ? _buildLoader(mutedColor)
-          : _error != null
-          ? _buildError(mutedColor)
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    if (_isLoading) {
+      return const AppSkeletonList(count: 4);
+    }
+    if (_error != null) {
+      return AppPage(child: _buildError());
+    }
+
+    return AppPage(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Savings Goals', style: theme.textTheme.headlineMedium),
+              OutlinedButton(
+                onPressed: _openNewGoalSheet,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: BorderSide(color: theme.dividerColor),
+                ),
+                child: const Text('+ New Goal'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Track your progress toward financial milestones.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          if (goals.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Savings Goals',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
-                        ),
-                      ),
-                      OutlinedButton(
-                        onPressed: _openNewGoalSheet,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.accent,
-                          side: BorderSide(color: borderColor),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        child: const Text(
-                          '+ New Goal',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderColor),
+                  if (_isRefreshing)
+                    const AppPill(label: 'Refreshing', color: AppColors.accent),
+                  if (_isStale)
+                    const AppPill(
+                      label: 'Showing cached goals',
+                      color: AppColors.warning,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'TOTAL SAVED',
-                          style: TextStyle(fontSize: 12, color: mutedColor),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          Formatters.formatKes(totalSaved),
-                          style: const TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.accent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (goals.isEmpty) _buildEmpty(mutedColor),
-                  Column(
-                    children: goals.map((g) {
-                      final saved = ((g['saved'] ?? 0) as num).toDouble();
-                      final target = ((g['target'] ?? 0) as num).toDouble();
-                      final monthly = ((g['monthly'] ?? 0) as num).toDouble();
-                      final pct = target <= 0
-                          ? 0.0
-                          : (saved / target * 100).clamp(0, 100).toDouble();
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: cardColor,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: borderColor),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  (g['name'] ?? '').toString(),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: textColor,
-                                  ),
-                                ),
-                                Text(
-                                  '${pct.toStringAsFixed(0)}%',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.accent,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(99),
-                              child: LinearProgressIndicator(
-                                value: (pct / 100),
-                                minHeight: 6,
-                                backgroundColor: borderColor,
-                                valueColor: const AlwaysStoppedAnimation<Color>(
-                                  AppColors.accent,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  '${Formatters.formatKes(saved)} saved',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: mutedColor,
-                                  ),
-                                ),
-                                Text(
-                                  'Goal: ${Formatters.formatKes(target)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: mutedColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            const Divider(height: 1),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Monthly: ${Formatters.formatKes(monthly)}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: mutedColor,
-                                  ),
-                                ),
-                                OutlinedButton(
-                                  onPressed: () => _openContributeSheet(g),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.accent,
-                                    side: BorderSide(
-                                      color: AppColors.accent.withOpacity(0.3),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Contribute',
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
                 ],
               ),
             ),
+          // Total saved card
+          AppGlassCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TOTAL SAVED',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  Formatters.formatKes(totalSaved),
+                  style: theme.textTheme.displayMedium?.copyWith(
+                    color: AppColors.accent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (goals.isEmpty) _buildEmpty(),
+          Column(
+            children: goals.map((g) {
+              final saved = ((g['saved'] ?? 0) as num).toDouble();
+              final target = ((g['target'] ?? 0) as num).toDouble();
+              final monthly = ((g['monthly'] ?? 0) as num).toDouble();
+              final pct = target <= 0
+                  ? 0.0
+                  : (saved / target * 100).clamp(0, 100).toDouble();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: AppGlassCard(
+                  radius: 24,
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              (g['name'] ?? '').toString(),
+                              style: theme.textTheme.titleMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${pct.toStringAsFixed(0)}%',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: (pct / 100),
+                          minHeight: 6,
+                          backgroundColor:
+                              theme.colorScheme.surfaceContainerHighest,
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            AppColors.accent,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${Formatters.formatKes(saved)} saved',
+                              style: theme.textTheme.bodySmall,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              'Goal: ${Formatters.formatKes(target)}',
+                              style: theme.textTheme.bodySmall,
+                              textAlign: TextAlign.end,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Divider(height: 1, color: theme.dividerColor),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Monthly: ${Formatters.formatKes(monthly)}',
+                              style: theme.textTheme.bodySmall,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton(
+                            onPressed: () => _openContributeSheet(g),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.accent,
+                              side: BorderSide(
+                                color: AppColors.accent.withOpacity(0.3),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: const Text(
+                              'Contribute',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -398,27 +402,9 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final theme = Theme.of(context);
 
-    InputDecoration inputDec(String label) => InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: mutedColor),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: borderColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: AppColors.accent),
-      ),
-    );
-
-    return Container(
-      color: bgColor,
+    return Padding(
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
@@ -431,31 +417,27 @@ class _NewGoalSheetState extends State<_NewGoalSheet> {
         children: [
           Text(
             'New Goal',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _nameCtrl,
-            style: TextStyle(color: textColor),
-            decoration: inputDec('Name'),
+            style: theme.textTheme.bodyLarge,
+            decoration: const InputDecoration(labelText: 'Name'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _targetCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(color: textColor),
-            decoration: inputDec('Target Amount'),
+            style: theme.textTheme.bodyLarge,
+            decoration: const InputDecoration(labelText: 'Target Amount'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _monthlyCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(color: textColor),
-            decoration: inputDec('Monthly Contribution'),
+            style: theme.textTheme.bodyLarge,
+            decoration: const InputDecoration(labelText: 'Monthly Contribution'),
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -549,14 +531,9 @@ class _ContributeSheetState extends State<_ContributeSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
+    final theme = Theme.of(context);
 
-    return Container(
-      color: bgColor,
+    return Padding(
       padding: EdgeInsets.only(
         left: 20,
         right: 20,
@@ -567,31 +544,13 @@ class _ContributeSheetState extends State<_ContributeSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Contribute',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-          ),
+          Text('Contribute', style: theme.textTheme.headlineSmall),
           const SizedBox(height: 16),
           TextField(
             controller: _amountCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(color: textColor),
-            decoration: InputDecoration(
-              labelText: 'Amount',
-              labelStyle: TextStyle(color: mutedColor),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppColors.accent),
-              ),
-            ),
+            style: theme.textTheme.bodyLarge,
+            decoration: const InputDecoration(labelText: 'Amount'),
           ),
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -638,148 +597,117 @@ class CloseoutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? AppColors.darkBg : AppColors.lightBg;
-    final cardColor = isDark ? AppColors.darkCard : AppColors.lightCard;
-    final borderColor = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-
+    final theme = Theme.of(context);
     final summary = ApiService.exampleCloseoutSummary;
 
-    return Container(
-      color: bgColor,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Monthly Closeout',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: textColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'February 2025 summary',
-              style: TextStyle(fontSize: 13, color: mutedColor),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: const [
-                _StepLabel(label: 'Summary', active: true),
-                _StepLabel(label: 'Surplus'),
-                _StepLabel(label: 'Sweep'),
-                _StepLabel(label: 'New Month'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
-              childAspectRatio: 1.2,
-              children: summary.metrics.map((m) {
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        m.label,
-                        style: TextStyle(fontSize: 11, color: mutedColor),
+    return AppPage(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Monthly Closeout', style: theme.textTheme.headlineMedium),
+          const SizedBox(height: 4),
+          Text(
+            'February 2025 summary',
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          // Step indicators
+          Row(
+            children: [
+              _StepLabel(label: 'Summary', active: true),
+              _StepLabel(label: 'Surplus'),
+              _StepLabel(label: 'Sweep'),
+              _StepLabel(label: 'New Month'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Metrics grid
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.4,
+            children: summary.metrics.map((m) {
+              return AppGlassCard(
+                radius: 20,
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(m.label, style: theme.textTheme.bodySmall),
+                    Text(
+                      m.value,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: m.color,
+                        fontWeight: FontWeight.w700,
                       ),
-                      Text(
-                        m.value,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: m.color,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Category Breakdown',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: textColor,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  ...summary.categoryDiffs.map(
-                    (c) => Column(
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          // Category breakdown
+          AppGlassCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Category Breakdown',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 10),
+                ...summary.categoryDiffs.map(
+                  (c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              c.label,
-                              style: TextStyle(fontSize: 13, color: textColor),
-                            ),
-                            Text(
-                              c.delta,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: c.delta.startsWith('-')
-                                    ? AppColors.danger
-                                    : AppColors.accent,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          c.label,
+                          style: theme.textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
-                        Divider(height: 1, color: borderColor),
-                        const SizedBox(height: 6),
+                        const SizedBox(width: 12),
+                        Text(
+                          c.delta,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: c.delta.startsWith('-')
+                                ? AppColors.danger
+                                : AppColors.accent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
                 ),
-                child: const Text('Sweep Surplus to Savings →'),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Sweep Surplus to Savings →'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -793,9 +721,7 @@ class _StepLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final mutedColor = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-
+    final theme = Theme.of(context);
     return Expanded(
       child: Container(
         padding: const EdgeInsets.only(bottom: 6),
@@ -810,9 +736,8 @@ class _StepLabel extends StatelessWidget {
         alignment: Alignment.center,
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 10,
-            color: active ? AppColors.accent : mutedColor,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: active ? AppColors.accent : null,
           ),
         ),
       ),

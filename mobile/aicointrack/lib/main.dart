@@ -1,52 +1,100 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'pages/login_page.dart';
 import 'pages/notification_permission_screen.dart';
 import 'services/auth_service.dart';
+import 'services/local_auth_lock_service.dart';
+import 'services/local_db_service.dart';
 import 'services/notification_transaction_service.dart';
 import 'services/pending_transactions_service.dart';
+import 'services/sync_service.dart';
 import 'services/token_service.dart';
 import 'pages/home_page.dart';
+import 'pages/pin_unlock_page.dart';
 import 'config/theme.dart';
 import 'providers/theme_provider.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Firebase ─────────────────────────────────────────────────────────────────
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+  FlutterError.onError = (FlutterErrorDetails details) {
+    debugPrint('[FlutterError] ${details.exceptionAsString()}');
+    debugPrint(details.stack.toString());
+  };
+
+  PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    debugPrint('[PlatformDispatcher] $error');
+    debugPrint(stack.toString());
+    return true;
+  };
+
+  await runZonedGuarded(
+    () async {
+      // ── Environment Configuration ─────────────────────────────────────────────
+      try {
+        await dotenv.load(fileName: '.env');
+        debugPrint('✓ Environment variables loaded from .env');
+      } catch (e) {
+        debugPrint('✗ Environment loading failed (non-fatal): $e');
+      }
+
+      // ── Firebase ──────────────────────────────────────────────────────────────
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        }
+        debugPrint('✓ Firebase initialized');
+      } catch (e) {
+        debugPrint('✗ Firebase initialization failed: $e');
+      }
+
+      // NOTE: ReownAuthService.init() requires a BuildContext, so it is called
+      // lazily the first time LoginPage builds — see LoginPage._initReown().
+      // BaseAuthService has no async init — it is fully stateless.
+
+      await LocalAuthLockService.initialize();
+
+      runApp(
+        ChangeNotifierProvider(
+          create: (_) => ThemeProvider(),
+          child: const MyApp(),
+        ),
       );
-    }
-    debugPrint('✓ Firebase initialized');
-  } catch (e) {
-    debugPrint('✗ Firebase initialization failed: $e');
-  }
 
-  // NOTE: ReownAuthService.init() requires a BuildContext, so it is called
-  // lazily the first time LoginPage builds — see LoginPage._initReown().
-  // BaseAuthService has no async init — it is fully stateless.
-
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
-      child: const MyApp(),
-    ),
+      unawaited(_warmStartupServices());
+    },
+    (Object error, StackTrace stack) {
+      debugPrint('[runZonedGuarded] $error');
+      debugPrint(stack.toString());
+    },
   );
+}
+
+Future<void> _warmStartupServices() async {
+  await LocalDbService.instance.init();
+  await PendingTxService.syncOnStartup();
+  await SyncService.instance.initialize();
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class _NavLogObserver extends NavigatorObserver {
-  void _log(String action, Route<dynamic>? route, Route<dynamic>? previousRoute) {
-    final toName = route?.settings.name ?? route?.runtimeType.toString() ?? 'null';
+  void _log(
+    String action,
+    Route<dynamic>? route,
+    Route<dynamic>? previousRoute,
+  ) {
+    final toName =
+        route?.settings.name ?? route?.runtimeType.toString() ?? 'null';
     final fromName =
         previousRoute?.settings.name ??
         previousRoute?.runtimeType.toString() ??
@@ -113,15 +161,19 @@ class _AuthGateState extends State<AuthGate> {
   final Set<int> _seenHashes = <int>{};
   StreamSubscription<bool>? _authSub;
   bool? _isAuthenticated;
+  bool _isLocallyLocked = false;
   String? _lastRenderedState;
 
   @override
   void initState() {
     super.initState();
     debugPrint('[AuthGate] initState');
+    _isLocallyLocked = LocalAuthLockService.isLocked;
+    LocalAuthLockService.lockStateListenable.addListener(
+      _handleLockStateChanged,
+    );
     unawaited(_initAuthGate());
     _initNotificationListener();
-    PendingTxService.syncOnStartup();
   }
 
   Future<void> _initAuthGate() async {
@@ -129,14 +181,16 @@ class _AuthGateState extends State<AuthGate> {
     final hasJwt = jwt != null && jwt.isNotEmpty;
     final hasFirebaseUser = AuthService.isUserSignedIn();
     final initialAuth = hasJwt || hasFirebaseUser;
+    final initialLocked = LocalAuthLockService.isLocked;
 
     debugPrint(
-      '[AuthGate] Initial auth resolved hasJwt=$hasJwt hasFirebaseUser=$hasFirebaseUser -> isAuth=$initialAuth',
+      '[AuthGate] Initial auth resolved hasJwt=$hasJwt hasFirebaseUser=$hasFirebaseUser locked=$initialLocked -> isAuth=$initialAuth',
     );
 
     if (mounted) {
       setState(() {
         _isAuthenticated = initialAuth;
+        _isLocallyLocked = initialLocked;
       });
     }
 
@@ -145,33 +199,52 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     debugPrint('[AuthGate] Subscribing to appAuthStateChanges');
-    _authSub = AuthService.appAuthStateChanges().listen((isAuth) async {
-      debugPrint('[AuthGate] appAuthStateChanges emitted isAuth=$isAuth');
-      if (!mounted) return;
+    _authSub = AuthService.appAuthStateChanges().listen(
+      (isAuth) async {
+        debugPrint('[AuthGate] appAuthStateChanges emitted isAuth=$isAuth');
+        if (!mounted) return;
 
-      final previous = _isAuthenticated;
-      if (previous != isAuth) {
-        debugPrint('[AuthGate] UI auth state transition $previous -> $isAuth');
-      }
+        final previous = _isAuthenticated;
+        if (previous != isAuth) {
+          debugPrint(
+            '[AuthGate] UI auth state transition $previous -> $isAuth',
+          );
+        }
 
-      setState(() {
-        _isAuthenticated = isAuth;
-      });
+        setState(() {
+          _isAuthenticated = isAuth;
+        });
 
-      if (isAuth) {
-        await _maybeShowPermissionScreen();
-      }
-    }, onError: (Object e, StackTrace st) {
-      debugPrint('[AuthGate] appAuthStateChanges error: $e');
-    }, onDone: () {
-      debugPrint('[AuthGate] appAuthStateChanges stream done');
-    });
+        if (isAuth) {
+          await LocalAuthLockService.lockIfNeeded();
+          await _maybeShowPermissionScreen();
+        } else {
+          await LocalAuthLockService.onSessionEnded();
+        }
+      },
+      onError: (Object e, StackTrace st) {
+        debugPrint('[AuthGate] appAuthStateChanges error: $e');
+      },
+      onDone: () {
+        debugPrint('[AuthGate] appAuthStateChanges stream done');
+      },
+    );
   }
 
   @override
   void dispose() {
+    LocalAuthLockService.lockStateListenable.removeListener(
+      _handleLockStateChanged,
+    );
     _authSub?.cancel();
     super.dispose();
+  }
+
+  void _handleLockStateChanged() {
+    if (!mounted) return;
+    setState(() {
+      _isLocallyLocked = LocalAuthLockService.isLocked;
+    });
   }
 
   Future<void> _maybeShowPermissionScreen() async {
@@ -233,15 +306,21 @@ class _AuthGateState extends State<AuthGate> {
         backgroundColor: AppTheme.darkTheme.scaffoldBackgroundColor,
         body: Center(
           child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(
-              AppColors.accent,
-            ),
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.accent),
           ),
         ),
       );
     }
 
     if (_isAuthenticated == true) {
+      if (_isLocallyLocked) {
+        if (_lastRenderedState != 'pin_unlock') {
+          _lastRenderedState = 'pin_unlock';
+          debugPrint('[AuthGate] Rendering PinUnlockPage');
+        }
+        return const PinUnlockPage();
+      }
+
       if (_lastRenderedState != 'home') {
         _lastRenderedState = 'home';
         debugPrint('[AuthGate] Rendering HomePage');

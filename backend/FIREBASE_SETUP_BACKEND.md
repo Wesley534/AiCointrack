@@ -6,7 +6,7 @@ This guide walks you through setting up Firebase authentication on the CoinTrack
 
 - Python 3.8+
 - Firebase project created (see mobile setup)
-- MySQL database running
+- Neon PostgreSQL database (https://console.neon.tech)
 
 ## 🚀 Quick Setup
 
@@ -203,28 +203,21 @@ app.add_middleware(
 2. **Flutter gets Firebase ID token** (valid for 1 hour)
 3. **Flutter sends token** to backend `/api/v1/auth/firebase/register`
 4. **Backend verifies token** with Firebase Admin SDK
-5. **Backend creates/updates user** in MySQL database
+5. **Backend creates/updates user** in PostgreSQL database (Neon)
 6. **Backend returns JWT token** (optional, for additional security)
 7. **Flutter stores JWT** for subsequent API calls
 
 ## 📊 Database Schema
 
-```sql
-CREATE TABLE users (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  hashed_password VARCHAR(255),  -- Nullable for Firebase users
-  full_name VARCHAR(255),
-  firebase_uid VARCHAR(255) UNIQUE,  -- Firebase UID
-  display_name VARCHAR(255),  -- From Firebase profile
-  photo_url VARCHAR(500),  -- Profile picture URL
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME ON UPDATE CURRENT_TIMESTAMP,
-  INDEX ix_users_email (email),
-  INDEX ix_users_firebase_uid (firebase_uid)
-);
-```
+Managed by Alembic migrations targeting PostgreSQL. Key tables:
+- `users` — Authentication, Firebase UID, wallet addresses
+- `transactions` — Financial transactions (offchain + onchain)
+- `budgets` — Budget planning
+- `savings_goals` — Savings targets
+- `shopping_lists` / `shopping_items` — Shopping tracking
+- `wallet_balances` — Cryptocurrency wallet balances
+
+> The schema is fully managed via Alembic — just run `alembic upgrade head`.
 
 ## 🐛 Troubleshooting
 
@@ -296,7 +289,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
 
 # Database
-DATABASE_URL=mysql+pymysql://user:password@localhost:3306/cointrack_db
+DATABASE_URL=postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
 
 # Optional: Specify service account key path
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/serviceAccountKey.json
